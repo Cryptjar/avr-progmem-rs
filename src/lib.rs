@@ -17,6 +17,89 @@
 //!
 //! Progmem utilities for the AVR architectures.
 //!
+//! This Crate provides unsafe utilities for working with with data stored in
+//! the program memory of an AVR micro-controller. And additionally a
+//! 'best-effort' safe a wrapper struct `ProgMem` simplify working with it.
+//!
+//! This crate is implemented only in Rust and some short assembly, it does not
+//! depend on the `avr-libc` or any other C-library. However, due to the use of
+//! inline assembly, this crate may only be compiled using a **nightly Rust**
+//! compiler.
+//!
+//!
+//! # AVR Memory
+//!
+//! This crate is specifically for AVR-base micro-controllers, which have a
+//! Harvard architecture that is the strictly separate program code and data.
+//! To that end, that both are separate address domains and the various
+//! assembly instructions are pre defined to whether they going to interpret an
+//! address within the data domain or the program code domain.
+//!
+//! While all ordinary data is stored of course in the data domain, it is
+//! sometimes of interest to store constant values actually in the program
+//! memory. However, due to the Harvard architecture those values are not
+//! accessible like other value, but have to be loaded from the program code
+//! domain using specialized instructions, i.e. the `lpm` (load _from_ program
+//! memory) instruction.
+//!
+//! Since there is nothing special about a pointer into program code which
+//! would differentiate it from normal data pointers it is entirely up to the
+//! programmer to ensure that these different 'pointer-type' are not
+//! accidentally mixed. In other words it is `unsafe` in the context of Rust.
+//!
+//!
+//! # Loading Data from Program Memory
+//!
+//! The first part of this crate simply provides a few functions to load a
+//! constant (i.e. actually a Rust `static` that is immutable) from the program
+//! memory into the data domain, so subsequentially, it is normal usable data.
+//!
+//! Because, as aforementioned, a simple `*const u8` in Rust dose not specify
+//! whether is lives in the program code domain or the data domain, all
+//! functions which simply load a given point from the program memory are
+//! inherently unsafe.
+//!
+//! Notice using a `&u8` reference might make things rather worse than safe.
+//! Because keeping a pointer/reference/address into the program memory as Rust
+//! reference, might easily cause it to be dereferenced even in safe code, but
+//! since that address is only valid in the program code domain (and Rust
+//! doesn't know about it) it would illegally load the address from the data
+//! memory causing Undefined Behavior!
+//!
+//!
+//! # The best-effort Wrapper
+//!
+//! Since working with progmem data, is inherently unsafe and rather
+//! difficult to do correctly, this crate introduces the best-effort 'safe'
+//! wrapper `ProgMem`, that is supposed to only wrap data in progmem, thus
+//! offering only function to load its content using the progmem loading
+//! function.
+//! The latter are fine and safe, given that the wrapper type really contains
+//! date in the program memory. Therefore to upkeep that invariant, the
+//! constructor is `unsafe`.
+//!
+//! Yet to make the point correctly this crate also contains a macro (it has to
+//! be a macro) which will create a static variable in program memory for you
+//! and wrap it in the `ProgMem`. It will ensure that the static will be store
+//! in the program memory by defining the `#[link_section = ".progmem"]`
+//! attribute on it.
+//!
+//!
+//! # Other Architectures
+//!
+//! As mentioned before, this crate is specifically designed to be use with
+//! AVR-base micro-controllers. But since most of us don't write their programs
+//! on an AVR system but on x86 or x86_64 systems, and might want to test them
+//! there (well as far as it is possible), this crate also has a fallback
+//! implementation for all other architectures that are not AVR, falling back
+//! to a simple Rust `static` in the default data segment. And all the data
+//! loading functions will just dereference the pointed to data, assuming that
+//! they just live in the default location.
+//!
+//! This fall back is perfectly safe on x86 and friend, and should also be fine
+//! on all further architectures, otherwise normal Rust `static`s would be
+//! broken.
+//!
 
 
 use core::mem::size_of;
@@ -26,16 +109,88 @@ use core::convert::TryInto;
 use cfg_if::cfg_if;
 
 
+/// Best-effort safe wrapper around a value in program memory.
+///
+/// This type wraps a value that is stored in program memory, and offers safe
+/// functions to load those values from program memory into the data memory (or
+/// at least some registers).
+///
+/// Since its constructer is the single most critical point in its API, it is
+/// `unsafe`, despite it is supposed to be a safe wrapper (hence the
+/// 'best-effort' notation).
+///
+/// However, there is a rather simple way to make is sound, and that is defining
+/// the `#[link_section = ".progmem"]` (or `".text"`) on a static that contains
+/// this struct. And since its that simple, a macro `progmem!` is provided that
+/// will ensure this and should be always used to obtain a `ProgMem` instance
+/// in the first place.
+///
+///
+/// # Safety
+///
+/// This type is a best-effort safe, thus it interface with unsafe Rust given
+/// some invariants (like any other safe wrapper).
+///
+/// The important and obvious invariant is that all values of the struct
+/// (instances) must be stored in the program memory. Since that is a property
+/// that the compiler (as of now) can not determine or assert or anything, it
+/// can't even be asserted, so far, the constructor is the central most unsafe
+/// point of this type.
+/// But once established it can't change (for statics at least),
+/// thus the only unsafe part of this type is the constructor where the user
+/// has to guarantee that it is indeed stored in a `static` in progmem.
+///
+/// Notice that if you got a `static mut` it is unsafe from a start so such a
+/// safe wrapper is of little use, and still then has the problem, that it is
+/// totally unsound to move it out of the static (e.g. using `std::mem::swap`
+/// on it).
+///
+/// Therefore, only a immutable `static` in the correct memory segment can be
+/// considered to be a correct location for it.
+///
 #[repr(transparent)]
 pub struct ProgMem<T>(T);
 
 impl<T> ProgMem<T> {
+	/// Construct a new instance of this type.
+	///
+	/// This struct is a wrapper type for data in the program code memory
+	/// domain. Therefore when constructing this struct, it must be guaranteed
+	/// to uphold this requirement! This contract is expressed by the fact that
+	/// this function is `unsafe`. Also see the Safety section for details.
+	///
+	/// To simplify, there is a macro `progmem!` which creates a static and
+	/// ensures that it is stored indeed in the program code memory domain, and
+	/// then makes a call to this function to wrap that static. A user of this
+	/// crate should always prefer using the `progmem!` macro to obtain a
+	/// `ProgMem` value!
+	///
+	/// # Safety
+	///
+	/// The `ProgMem` wrapper is build around the invariant that itself an thus
+	/// its inner value are stored in the program code memory domain (on the
+	/// AVR architecture).
+	///
+	/// That means that this function is only sound to call, if the value is
+	/// stored in a static that is for instance attributed with
+	/// `#[link_section = ".progmem"]`.
+	///
+	/// However, the above requirement only applies to the AVR architecture
+	/// (`#[cfg(target_arch = "avr")]`), because otherwise normal data access
+	/// primitives are used. This means that the value must be stored in the
+	/// regular data memory domain for ALL OTHER architectures! This still
+	/// holds, even if such other architecture is of the Harvard architecture,
+	/// because this is an AVR-only crate, not a general Harvard architecture
+	/// crate!
+	///
 	pub const unsafe fn new(t: T) -> Self {
 		ProgMem(t)
 	}
 }
 
 impl<T: Copy> ProgMem<T> {
+	/// Read the inner value from progmem and return a regular value.
+	///
 	pub fn load(&self) -> T {
 		// Get the actual address of the value to load
 		let p_addr = &self.0;
@@ -48,13 +203,32 @@ impl<T: Copy> ProgMem<T> {
 		}
 	}
 
+	/// Return the raw pointer to the inner value.
+	///
+	/// Notice that the returned pointer is indeed a pointer into the progmem
+	/// domain! It may never be dereferenced via the default Rust operations.
+	/// That means a `unsafe{*pm.get_inner_ptr()}` is Undefined Behavior!
+	///
 	pub fn ptr(&self) -> *const T {
 		&self.0
 	}
 }
 
+/// Utilities to work with an array in progmem.
 impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 
+	/// Load a single element from the inner array.
+	///
+	/// This method is analog to a slice indexing `self.inner[idx]`, so the
+	/// same requirements apply, like the index `idx` should be less then the
+	/// length `N` of the array, otherwise a panic will be risen.
+	///
+	///
+	/// # Panics
+	///
+	/// This method panics, if the given index `idx` is grater or equal to the
+	/// length `N` of the inner type.
+	///
 	pub fn load_at(&self, idx: usize) -> T {
 		// Just take a reference to the selected element.
 		// Notice that this will execute a bounds check.
@@ -71,6 +245,25 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 		}
 	}
 
+	/// Loads a sub array from the inner array.
+	///
+	/// This method is analog to a sub-slicing `self.inner[idx..(idx+M)]` but
+	/// returning an owned array instead of a slice, simply because it has to
+	/// copy the data anyway from the progmem into the data domain (i.e. the
+	/// stack).
+	///
+	/// Also notice, that since this crate is intended for AVR
+	/// micro-controllers, static arrays are generally preferred over
+	/// dynamically allocated types such as a `Vec` (as of now (mid-2020) there
+	/// isn't even a good way to get a `Vec` on AVR in Rust).
+	///
+	///
+	/// # Panics
+	///
+	/// This method panics, if the given index `idx` is grater or equal to the
+	/// length `N` of the inner array, or the end index `idx+M` is grater than
+	/// the length `N` of the inner array.
+	///
 	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T;M] {
 		assert!(M <= N);
 
@@ -117,19 +310,59 @@ macro_rules! progmem_internal {
 	};
 }
 
+/// Define a static in progmem.
+///
+/// This is a helper macro to simplify the definition of statics that are valid
+/// to be wrapped in the `ProgMem` struct thus providing a safe way to work
+/// with data in progmem.
+///
+/// Thus this macro essentially takes a user static definition and emits a
+/// definition that is defined to be stored in the progmem section and then is
+/// wrap in the `ProgMem` wrapper for safe access.
+///
+///
+/// # Examples
+///
+/// ```
+/// use avr_progmem::progmem;
+///
+/// progmem!{
+///     /// Static string stored in progmem!
+///     pub static progmem WORDS: [u8; 4] = *b"abcd";
+/// }
+///
+/// let data: [u8; 4] = WORDS.load();
+/// assert_eq!(b"abcd", &data);
+/// ```
+///
+/// ```
+/// use avr_progmem::progmem;
+///
+/// progmem!{
+///     /// 4kB string stored in progmem!
+///     pub static progmem WORDS: [u8; 4096] = [b'X'; 4096];
+/// }
+/// let first_bytes: [u8; 16] = WORDS.load_sub_array(0);
+/// assert_eq!([b'X'; 16], first_bytes);
+/// ```
+///
+///
 #[macro_export]
 macro_rules! progmem {
+	// Match private (not pub) definitions.
 	($(#[$attr:meta])* static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
 		// use `()` to explicitly forward the information about private items
 		$crate::progmem_internal!($(#[$attr])* () static ref $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
 		$crate::progmem!($($t)*);
 	};
+	// Match simple public (just pub) definitions.
 	($(#[$attr:meta])* pub static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
 		$crate::progmem_internal!($(#[$attr])* (pub) static $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
 		$crate::progmem!($($t)*);
 	};
+	// Match public path (pub with path) definitions.
 	($(#[$attr:meta])* pub ($($vis:tt)+) static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
 		$crate::progmem_internal!($(#[$attr])* (pub ($($vis)+)) static $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
@@ -139,47 +372,86 @@ macro_rules! progmem {
 }
 
 
-#[cfg(not(target_arch = "avr"))]
+/// Read a single byte from the progmem.
+///
+/// This function reads just a single byte from the program code memory domain.
+///
+/// # Safety
+///
+/// The given point must be valid in the program domain which in AVR normal
+/// pointers (to data) are NOT, because they point into the data domain.
+///
+/// Typically only function pointers (which make no sense here) and pointer to
+/// or into statics that are defined to be stored into progmem are valid.
+/// For instance, a valid progmem statics would be one, that is attributed with
+/// `#[link_section = ".progmem"]`.
+///
+/// Also general Rust pointer dereferencing constraints apply, i.e. it must not
+/// be dangling.
+///
 pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
-	// This is a non AVR dummy.
-	// We have to assume that otherwise a normal data or text segment would be
-	// used, and thus that it is actually save to access it directly!
+	cfg_if! {
+		if #[cfg(target_arch = "avr")] {
+			// Only addresses below the 64 KiB limit are supported!
+			// Apparently this is of no concern for architectures with true
+			// 16-bit pointers.
+			assert!(p_addr as usize <= u16::MAX as usize);
 
-	// Notice the above assumption fails and results in UB for any other
-	// Harvard architecture other than AVR.
+			// Allocate a byte for the output (actually a single register r0
+			// will be used).
+			let res: u8;
 
-	*p_addr
+			// The inline assembly to read a single byte from given address
+			llvm_asm!(
+				// Just issue the single `lpm` assembly instruction, which reads
+				// implicitly indirectly the address from the Z register, and
+				// stores implicitly the read value in the register 0.
+				"lpm"
+				// Output is in the register 0
+				: "={r0}"(res)
+				// Input the program memory address to read from
+				: "z"(p_addr)
+				// No clobber list.
+			);
+
+			// Just output the read value
+			res
+
+		} else {
+			// This is the non-AVR dummy.
+			// We have to assume that otherwise a normal data or text segment
+			// would be used, and thus that it is actually save to access it
+			// directly!
+
+			// Notice the above assumption fails and results in UB for any other
+			// Harvard architecture other than AVR.
+
+			*p_addr
+		}
+	}
 }
 
-#[cfg(target_arch = "avr")]
-pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
-	// Only addresses below the 64 KiB limit are supported
-	// Apparently this is of no concern for architectures with true 16-bit
-	// pointers.
-	assert!(p_addr as usize <= u16::MAX as usize);
-
-	// Allocate a byte for the output (actually a single register r0 will be
-	// used).
-	let res: u8;
-
-	// The inline assembly to read a single byte from given address
-	llvm_asm!(
-		// Just issue the single `lpm` assembly instruction, which reads
-		// implicitly indirectly the address from the Z register, and stores
-		// implicitly the read value in the register 0.
-		"lpm"
-		// Output is in the register 0
-		: "={r0}"(res)
-		// Input the program memory address to read from
-		: "z"(p_addr)
-		// No clobber list.
-	);
-
-	// Just output the read value
-	res
-}
-
-/// Only for internals
+/// Read an array of type `T` from progmem into data array.
+///
+/// This function uses the above byte-wise `read_progmem_byte` function instead
+/// of the looped assembly of `read_progmem_asm_loop_raw`.
+///
+///
+/// # Safety
+///
+/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
+/// has the same basic requirements such as both pointers must be valid for
+/// dereferencing i.e. not dangling and both pointers must
+/// be valid to read or write, respectively, of `len` many elements of type `T`,
+/// i.e. `len * size_of::<T>()` bytes.
+///
+/// Additionally, `p_addr` must be a valid pointer into the program memory
+/// domain. And `out` must be valid point to a writable location in the data
+/// memory.
+///
+/// However alignment is not strictly required for AVR, since the read/write is
+/// done byte-wise.
+///
 unsafe fn read_progmem_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
@@ -207,16 +479,33 @@ unsafe fn read_progmem_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 	}
 }
 
-#[cfg(not(target_arch = "avr"))]
+/// Read an array of type `T` from progmem into data array.
+///
+/// This function uses the optimized `read_progmem_asm_loop_raw` with a looped
+/// assembly instead of byte-wise `read_progmem_byte` function.
+///
+///
+/// # Safety
+///
+/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
+/// has the same basic requirements such as both pointers must be valid for
+/// dereferencing i.e. not dangling and both pointers must
+/// be valid to read or write, respectively, of `len` many elements of type `T`,
+/// i.e. `len * size_of::<T>()` bytes.
+///
+/// Additionally, `p_addr` must be a valid pointer into the program memory
+/// domain. And `out` must be valid point to a writable location in the data
+/// memory.
+///
+/// However alignment is not strictly required for AVR, since the read/write is
+/// done byte-wise, but the non-AVR fallback dose actually use
+/// `core::ptr::copy` and therefore the pointers must be aligned.
+///
 unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
-	// This is a non AVR dummy.
-	// We have to assume that otherwise a normal data or text segment would be
-	// used, and thus that it is actually save to access it directly!
 
-	// Notice the above assumption fails and results in UB for any other
-	// Harvard architecture other than AVR.
-
-	// Nevertheless, keep the same requirements as the AVR impl:
+	// Here are the general requirements essentially required by the AVR-impl
+	// However, assume, the non-AVR version is only used in tests, it makes a
+	// lot of sens to ensure the AVR requirements are held up.
 
 	// Loop head check, just return for zero iterations
 	if len == 0 || size_of::<T>() == 0 {
@@ -235,76 +524,95 @@ unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 	// Now its fine to cast down to u8
 	let size_bytes = size_bytes as u8;
 
-	// Now, just copy the bytes from p_addr to out
-	core::ptr::copy(p_addr, out, len as usize);
-}
 
-/// Only for internals
-#[cfg(target_arch = "avr")]
-unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
-		where T: Sized + Copy {
+	cfg_if!{
+		if #[cfg(target_arch = "avr")] {
+			// Only addresses below the 64 KiB limit are supported
+			// Apparently this is of no concern for architectures with true
+			// 16-bit pointers.
+			assert!(p_addr as usize <= u16::MAX as usize);
 
-	// Only addresses below the 64 KiB limit are supported
-	// Apparently this is of no concern for architectures with true 16-bit
-	// pointers.
-	assert!(p_addr as usize <= u16::MAX as usize);
+			// A loop to read a slice of T from prog memory
+			// The prog memory address (addr) is stored in the 16-bit address
+			// register Z (since this is the default register for the `lpm`
+			// instruction).
+			// The output data memory address (out) is stored in the 16-bit
+			// address register X, because Z is already used and Y seams to be
+			// used other wise or is callee-save, whatever, it emits more
+			// instructions by llvm.
+			//
+			// This loop appears in the assembly, because it allows to exploit
+			// `lpm 0, Z+` instruction that simultaneously increments the
+			// pointer.
+			llvm_asm!(
+				"
+					// load value from program memory at indirect Z into register 0
+					// and increment Z by one
+					lpm 0, Z+
+					// write register 0 to data memory at indirect X
+					// and increment X by one
+					st X+, 0
+					// Decrement the loop counter in register $0 (size_bytes).
+					// If zero has been reached the equality flag is set.
+					subi $0, 1
+					// Check whether the end has not been reached and if so jump back.
+					// The end is reached if $0 (size_bytes) == 0, i.e. equality flag
+					// is set.
+					// Thus if equality flag is NOT set (brNE) jump back by 4
+					// instruction, that are all instructions in this assembly.
+					// Notice: 4 instructions = 8 Byte
+					brne -8
+				"
+				// No direct outputs
+				:
+				// Input the iteration count, input program memory address,
+				// and output data memory address
+				: "r"(size_bytes), "z"(p_addr), "x"(out)
+				// The register 0 is clobbered
+				: "0"
+			);
 
-	// Loop head check, just return for zero iterations
-	if len == 0 || size_of::<T>() == 0 {
-		return
+		} else {
+			// This is a non-AVR dummy.
+			// We have to assume that otherwise a normal data or text segment
+			// would be used, and thus that it is actually save to access it
+			// directly!
+
+			// Notice the above assumption fails and results in UB for any other
+			// Harvard architecture other than AVR.
+
+			// Now, just copy the bytes from p_addr to out
+			// It is save by the way, because we require the user to give use
+			// pointer valid for exactly that case.
+			core::ptr::copy(p_addr, out, len as usize);
+		}
 	}
-
-	// Get size in bytes of T
-	let size_type = size_of::<T>();
-	// Must not exceed 256 byte
-	assert!(size_type <= u8::MAX as usize);
-
-	// Multiply with the given length
-	let size_bytes = size_type * len as usize;
-	// Must still not exceed 256 byte
-	assert!(size_bytes <= u8::MAX as usize);
-	// Now its fine to cast down to u8
-	let size_bytes = size_bytes as u8;
-
-	// A loop to read a slice of T from prog memory
-	// The prog memory address (addr) is stored in the 16-bit address register Z
-	// (since this is the default register for the `lpm` instruction).
-	// The output data memory address (out) is stored in the 16-bit address
-	// register X, because Z is already used and Y seams to be used other wise
-	// or is callee-save.
-	//
-	// This loop appears in the assembly, because it allows to exploit
-	// `lpm 0, Z+` instruction that simultaneously increments the pointer.
-	llvm_asm!(
-		"
-			// load value from program memory at indirect Z into register 0
-			// and increment Z by one
-			lpm 0, Z+
-			// write register 0 to data memory at indirect X
-			// and increment X by one
-			st X+, 0
-			// Decrement the loop counter in register $0 (size_bytes).
-			// If zero has been reached the equality flag is set.
-			subi $0, 1
-			// Check whether the end has not been reached and if so jump back.
-			// The end is reached if $0 (size_bytes) == 0, i.e. equality flag
-			// is set.
-			// Thus if equality flag is NOT set (brNE) jump back by 4
-			// instruction, that are all instructions in this assembly.
-			// Notice: 4 instructions = 8 Byte
-			brne -8
-		"
-		// No direct outputs
-		:
-		// Input the iteration count, input program memory address,
-		// and output data memory address
-		: "r"(size_bytes), "z"(p_addr), "x"(out)
-		// The register 0 is clobbered
-		: "0"
-	);
-
 }
 
+
+/// Read an array of type `T` from progmem into data array.
+///
+/// This function uses either the optimized `read_progmem_asm_loop_raw` with a
+/// looped assembly instead of byte-wise `read_progmem_byte` function depending
+/// whether the `lpm-asm-loop` crate feature is set.
+///
+///
+/// # Safety
+///
+/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
+/// has the same basic requirements such as both pointers must be valid for
+/// dereferencing i.e. not dangling and both pointers must
+/// be valid to read or write, respectively, of `len` many elements of type `T`,
+/// i.e. `len * size_of::<T>()` bytes.
+///
+/// Additionally, `p_addr` must be a valid pointer into the program memory
+/// domain. And `out` must be valid point to a writable location in the data
+/// memory.
+///
+/// While the alignment is not strictly required for AVR, the non-AVR fallback
+/// might be done actually use `core::ptr::copy` and therefore the pointers
+/// must be aligned.
+///
 unsafe fn read_progmem_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
@@ -318,6 +626,33 @@ unsafe fn read_progmem_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 }
 
 
+/// Read a slice of type `T` from progmem into given slice in data memory.
+///
+/// This function uses either a optimized assembly with loop or just a
+/// byte-wise assembly function which is looped outside depending on
+/// whether the `lpm-asm-loop` crate feature is set or not.
+///
+///
+/// # Safety
+///
+/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
+/// has the same basic requirements such as both pointers must be valid for
+/// dereferencing i.e. not dangling and both pointers must
+/// be valid to read or write, respectively, of `len` many elements of type `T`,
+/// i.e. `len * size_of::<T>()` bytes.
+///
+/// Additionally, `p_addr` must be a valid pointer into the program memory
+/// domain. And `out` must be valid point to a writable location in the data
+/// memory.
+///
+/// While the alignment is not strictly required for AVR, the non-AVR fallback
+/// might be done actually use `core::ptr::copy` and therefore the pointers
+/// must be aligned.
+///
+/// Also notice, that the output slice must be correctly initialized, it would
+/// be UB if not. If you don't want to initialize the data upfront, the
+/// `read_value` might be a good alternative.
+///
 #[cfg_attr(feature = "dev", inline(never))]
 pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 	assert_eq!(p.len(), out.len());
@@ -331,6 +666,39 @@ pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 }
 
 
+/// Read a single `T` from progmem and return it by value.
+///
+/// This function uses either a optimized assembly with loop or just a
+/// byte-wise assembly function which is looped outside depending on
+/// whether the `lpm-asm-loop` crate feature is set or not.
+///
+/// Notice that `T` might be also something like `[T, N]` so that in fact
+/// entire arrays can be loaded using this function. Alternatively if the the
+/// size of an array can not be known at compile time (i.e. a slice) there is
+/// also the `read_progmem_slice` function, but it requires proper
+/// initialization upfront.
+///
+///
+/// # Safety
+///
+/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
+/// has the same basic requirements such as both pointers must be valid for
+/// dereferencing i.e. not dangling and both pointers must
+/// be valid to read or write, respectively, of `len` many elements of type `T`,
+/// i.e. `len * size_of::<T>()` bytes.
+///
+/// Additionally, `p_addr` must be a valid pointer into the program memory
+/// domain. And `out` must be valid point to a writable location in the data
+/// memory.
+///
+/// While the alignment is not strictly required for AVR, the non-AVR fallback
+/// might be done actually use `core::ptr::copy` and therefore the pointers
+/// must be aligned.
+///
+/// Also notice, that the output slice must be correctly initialized, it would
+/// be UB if not. If you don't want to initialize the data upfront, the
+/// `read_value` might be a good alternative.
+///
 #[cfg_attr(feature = "dev", inline(never))]
 pub unsafe fn read_value<T>(p: &T) -> T
 		where T: Sized + Copy {
