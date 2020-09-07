@@ -1,5 +1,5 @@
 [package]
-name = "avr-progmem-rs"
+name = "avr-progmem"
 version = "0.1.0"
 authors = ["Cryptjar <cryptjar@junk.studio>"]
 edition = "2018"
