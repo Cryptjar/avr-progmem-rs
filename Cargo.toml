@@ -5,10 +5,14 @@ authors = ["Cryptjar <cryptjar@junk.studio>"]
 edition = "2018"
 
 [features]
-default = []
+default = ["lpm-asm-loop"]
+# Enables the use of the `lpm r0, Z+` in an assembly loop, instead of the plain
+# `lpm` instruction with a Rust loop.
+lpm-asm-loop = []
 # Enables some tweak to ease debugging, should not be use in production
 dev = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cfg-if = "*"
