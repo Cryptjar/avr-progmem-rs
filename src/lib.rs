@@ -1,6 +1,22 @@
+
+// We don't need anything from std, and on AVR there is no std anyway.
 #![no_std]
+
+// We need inline assembly for the `lpm` instruction.
 #![feature(llvm_asm)]
-#![feature(min_const_generics)]
+
+// We need const generics, however the `const_generics` feature is reported as
+// incomplete, thus we actually use the `min_const_generics` feature, which is
+// sufficient for us. However, min_const_generics in turn fails to work with
+// `cargo doc`, thus when documenting we fallback to the incomplete
+// `const_generics` feature, because it has actual doc support.
+#![cfg_attr(doc, feature(const_generics))]
+#![cfg_attr(not(doc), feature(min_const_generics))]
+
+
+//!
+//! Progmem utilities for the AVR architectures.
+//!
 
 
 use core::mem::size_of;
@@ -20,40 +36,64 @@ impl<T> ProgMem<T> {
 }
 
 impl<T: Copy> ProgMem<T> {
-	pub fn read(&self) -> T {
-		let addr = &self.0;
+	pub fn load(&self) -> T {
+		// Get the actual address of the value to load
+		let p_addr = &self.0;
 
+		// This is safe, because the invariant of this struct demands that
+		// this value (i.e. self and thus also its inner value) are stored
+		// in the progmem domain, which is what `read_value` requires from us.
 		unsafe {
-			read_value(addr)
+			read_value(p_addr)
 		}
 	}
-	pub unsafe fn get_inner_ref(&self) -> &T {
+
+	pub fn ptr(&self) -> *const T {
 		&self.0
 	}
 }
 
 impl<T: Copy, const N: usize> ProgMem<[T;N]> {
-	pub fn get(&self, idx: usize) -> T {
-		let addr = &self.0[idx];
 
+	pub fn load_at(&self, idx: usize) -> T {
+		// Just take a reference to the selected element.
+		// Notice that this will execute a bounds check.
+		let addr: &T = &self.0[idx];
+
+		// This is safe, because the invariant of this struct demands that
+		// this value (i.e. self and thus also its inner value) are stored
+		// in the progmem domain, which is what `read_value` requires from us.
+		//
+		// Also notice that the slice-indexing above gives us a bounds check.
+		//
 		unsafe {
 			read_value(addr)
 		}
 	}
 
-	pub fn get_range<const M: usize>(&self, idx: usize) -> [T;M] {
+	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T;M] {
 		assert!(M <= N);
 
 		// Make sure that we convert from &[T] to &[T;M] without constructing
 		// an actual [T;M], because we MAY NOT LOAD THE DATA YET!
-		let array: &[T;M] = self.0[idx..(idx+M)].try_into().unwrap();
+		// Also notice, that this sub-slicing dose ensure that the bound are
+		// correct.
+		let slice: &[T] = &self.0[start_idx..(start_idx+M)];
+		let array: &[T;M] = slice.try_into().unwrap();
 
+		// This is safe, because the invariant of this struct demands that
+		// this value (i.e. self and thus also its inner value) are stored
+		// in the progmem domain, which is what `read_value` requires from us.
+		//
+		// Also notice that the sub-slicing above gives us a bounds check.
+		//
 		unsafe {
 			read_value(array)
 		}
 	}
 }
 
+/// Only for internal use. Use the `progmem!` macro instead.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! progmem_internal {
@@ -79,27 +119,39 @@ macro_rules! progmem_internal {
 
 #[macro_export]
 macro_rules! progmem {
-    ($(#[$attr:meta])* static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-        // use `()` to explicitly forward the information about private items
-        progmem_internal!($(#[$attr])* () static ref $N : $T = $e;);
+	($(#[$attr:meta])* static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
+		// use `()` to explicitly forward the information about private items
+		$crate::progmem_internal!($(#[$attr])* () static ref $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
-		progmem!($($t)*);
-    };
-    ($(#[$attr:meta])* pub static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-        progmem_internal!($(#[$attr])* (pub) static $N : $T = $e;);
+		$crate::progmem!($($t)*);
+	};
+	($(#[$attr:meta])* pub static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
+		$crate::progmem_internal!($(#[$attr])* (pub) static $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
-		progmem!($($t)*);
-    };
-    ($(#[$attr:meta])* pub ($($vis:tt)+) static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-        progmem_internal!($(#[$attr])* (pub ($($vis)+)) static $N : $T = $e;);
+		$crate::progmem!($($t)*);
+	};
+	($(#[$attr:meta])* pub ($($vis:tt)+) static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
+		$crate::progmem_internal!($(#[$attr])* (pub ($($vis)+)) static $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
-		progmem!($($t)*);
-    };
-    () => ()
+		$crate::progmem!($($t)*);
+	};
+	() => ()
 }
 
 
+#[cfg(not(target_arch = "avr"))]
+pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
+	// This is a non AVR dummy.
+	// We have to assume that otherwise a normal data or text segment would be
+	// used, and thus that it is actually save to access it directly!
 
+	// Notice the above assumption fails and results in UB for any other
+	// Harvard architecture other than AVR.
+
+	*p_addr
+}
+
+#[cfg(target_arch = "avr")]
 pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
 	// Only addresses below the 64 KiB limit are supported
 	// Apparently this is of no concern for architectures with true 16-bit
@@ -155,7 +207,40 @@ unsafe fn read_progmem_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 	}
 }
 
+#[cfg(not(target_arch = "avr"))]
+unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
+	// This is a non AVR dummy.
+	// We have to assume that otherwise a normal data or text segment would be
+	// used, and thus that it is actually save to access it directly!
+
+	// Notice the above assumption fails and results in UB for any other
+	// Harvard architecture other than AVR.
+
+	// Nevertheless, keep the same requirements as the AVR impl:
+
+	// Loop head check, just return for zero iterations
+	if len == 0 || size_of::<T>() == 0 {
+		return
+	}
+
+	// Get size in bytes of T
+	let size_type = size_of::<T>();
+	// Must not exceed 256 byte
+	assert!(size_type <= u8::MAX as usize);
+
+	// Multiply with the given length
+	let size_bytes = size_type * len as usize;
+	// Must still not exceed 256 byte
+	assert!(size_bytes <= u8::MAX as usize);
+	// Now its fine to cast down to u8
+	let size_bytes = size_bytes as u8;
+
+	// Now, just copy the bytes from p_addr to out
+	core::ptr::copy(p_addr, out, len as usize);
+}
+
 /// Only for internals
+#[cfg(target_arch = "avr")]
 unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
@@ -233,6 +318,7 @@ unsafe fn read_progmem_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 }
 
 
+#[cfg_attr(feature = "dev", inline(never))]
 pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 	assert_eq!(p.len(), out.len());
 	assert!(p.len() <= u8::MAX as usize);
@@ -244,19 +330,20 @@ pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 	read_progmem_value_raw(p_addr, out_bytes, len);
 }
 
+
 #[cfg_attr(feature = "dev", inline(never))]
 pub unsafe fn read_value<T>(p: &T) -> T
 		where T: Sized + Copy {
 
 	let mut buffer = MaybeUninit::<T>::uninit();
 	let size = size_of::<T>();
+	// TODO add a local loop to process bigger chunks in 256 Byte blocks
 	assert!(size <= u8::MAX as usize);
 
 	let addr: *const T = p;
 	let res: *mut T = buffer.as_mut_ptr();
-	let len: u8 = size as u8;
 
-	read_progmem_value_raw(addr, res, len);
+	read_progmem_value_raw(addr, res, 1);
 
 	buffer.assume_init()
 }
