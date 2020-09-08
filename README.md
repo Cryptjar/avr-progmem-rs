@@ -138,6 +138,29 @@ broken. However, it is an important point to know when for instance writing
 a library that is not limited to AVR.
 
 
+# Implementation Limitations
+
+Aside from what has been already been covered, the current implementation
+has two further limitations.
+
+First, since this crate uses an inline assembly loop on a 8-bit
+architecture, the loop counter only allows values up to 255. This means
+that not more that 255 bytes can be loaded at once with any of the methods
+of this crate. However, this only applies to a single continuous load
+operation, so for instance `ProgMem<[u8;1024]>::load()` will panic, but
+accessing such a big type in smaller chunks e.g.
+`ProgMem<[u8;1024]>::load_sub_array::<[u8;128]>(512)` is perfectly fine
+because the to be loaded type `[u8;128]` is only 128 bytes in size.
+
+Second, since this crate only uses the `lpm` instruction, which is limited
+by a 16-bit pointer, this crate may only be used with data stored in the
+lower 64 kiB of program memory. Since this property has not be tested it is
+unclear whether it will cause a panic or right-up undefined behavior, so be
+very wary when working with AVR chips having more then 64 kiB of program
+memory.
+This second restriction, of course, dose not apply to non-AVR architectures.
+
+
 [`ProgMem`]: https://docs.rs/avr-progmem/latest/avr_progmem/struct.ProgMem.html
 [`read_byte`]: https://docs.rs/avr-progmem/latest/avr_progmem/fn.read_byte.html
 [`progmem!`]: https://docs.rs/avr-progmem/latest/avr_progmem/macro.progmem.html
