@@ -2,6 +2,7 @@
 name = "avr-progmem"
 version = "0.1.0"
 authors = ["Cryptjar <cryptjar@junk.studio>"]
+license = "Apache-2.0"
 edition = "2018"
 
 description = "Progmem utilities for the AVR architectures"
