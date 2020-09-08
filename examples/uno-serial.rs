@@ -44,9 +44,11 @@ use avr_progmem::progmem;
 
 
 // The length of the below data block.
-const TEXT_LEN: usize = 1243;
+const TEXT_LEN: usize = 2177;
 progmem! {
-	// The static data to be stored in program code section
+	/// The static data to be stored in program code section
+	/// Notice this is just about 2 kiB, and the Arduino Uno only has 2 kiB of
+	/// SRAM, so if where not stored in progmem, would not work at all.
 	static progmem TEXT: [u8;TEXT_LEN] = *include_bytes!("./test_text.txt");
 }
 

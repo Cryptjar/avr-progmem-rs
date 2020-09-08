@@ -1,20 +1,41 @@
+# AVR Memory
+
 This crate is specifically for AVR-base micro-controllers such as
 the Arduino Uno (and some other Arduino boards, but not all), which have a
-modified Harvard architecture that is the strict separation between program
-code and data, while having special instruction to read and write to the
-program memory.   
+modified Harvard architecture which implies the strict separation of program
+code and data while having special instructions to read and write to
+program memory.
 
-While all ordinary data is stored of course in the data domain, where it is
+While, of course, all ordinary data is stored in the data domain where it is
 perfectly usable, the harsh constraints of most AVR processors make it very
-appealing to use the program memory (also referred to as _progmem_) for
-storing constant values. However, due to the Harvard design those values
+appealing to use the program memory (also referred to as progmem) for
+storing constant values. However, due to the Harvard design, those values
 are not usable with normal instructions (i.e. those emitted from normal
-Rust code). Instead, special instructions are required to loaded data from
-the program code domain, i.e. the `lpm` (load _from_ program memory)
+Rust code). Instead, special instructions are required to load data from
+the program code domain, i.e. the `lpm` (load from program memory)
 instruction. And because there is no way to emit it from Rust code, this
 crate uses inline assembly to emit that instruction.
 
-However, since there is nothing special about a pointer into program code
-which would differentiate it from normal data pointers it is entirely up to
-the programmer to ensure that these different 'pointer-type' are not
-accidentally mixed. In other words it is `unsafe` in the context of Rust.
+However, since a pointer into program code cannot be differentiated from a
+normal data pointer, it is entirely up to the programmer to ensure that
+these different 'pointer-types' are not accidentally mixed. In other words,
+this is `unsafe` in the context of Rust.
+
+# Loading Data from Program Memory
+
+The first part of this crate simply provides a few functions (e.g.
+`read_byte`) to load constant data (i.e. a Rust `static` that is
+immutable) from the program memory into the data domain, so that
+sub-sequentially it is normal usable data, i.e. as owned data on the stack.
+
+Because, as aforementioned, a simple `*const u8` in Rust does not specify
+whether is lives in the program code domain or the data domain, all
+functions which simply load a given pointer from the program memory are
+inherently `unsafe`.
+
+Notice that using a `&u8` reference might make things rather worse than
+safe. Because keeping a pointer/reference/address into the program memory
+as Rust reference might easily cause it to be dereferenced, even in safe
+code. But since that address is only valid in the program code domain (and
+Rust doesn't know about it) it would illegally load the address from the
+data memory, causing **undefined behavior**!
