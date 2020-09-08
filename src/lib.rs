@@ -54,7 +54,7 @@
 //! # Loading Data from Program Memory
 //!
 //! The first part of this crate simply provides a few functions (e.g.
-//! [`read_progmem_byte`]) to load constant data (i.e. a Rust `static` that is
+//! [`read_byte`]) to load constant data (i.e. a Rust `static` that is
 //! immutable) from the program memory into the data domain, so that
 //! sub-sequentially it is normal usable data, i.e. as owned data on the stack.
 //!
@@ -73,7 +73,7 @@
 //! ## Example
 //!
 //! ```
-//! use avr_progmem::read_progmem_byte;
+//! use avr_progmem::read_byte;
 //!
 //! // This `static` must never be directly dereferenced/accessed!
 //! // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
@@ -84,7 +84,7 @@
 //! // Load the byte from progmem
 //! // Here, it is sound, because due to the link_section it is indeed in the
 //! // program code memory.
-//! let data: u8 = unsafe { read_progmem_byte(&P_BYTE) };
+//! let data: u8 = unsafe { read_byte(&P_BYTE) };
 //! assert_eq!(b'A', data);
 //! ```
 //!
@@ -151,7 +151,7 @@
 //!
 //!
 //! [`ProgMem`]: struct.ProgMem.html
-//! [`read_progmem_byte`]: fn.read_progmem_byte.html
+//! [`read_byte`]: fn.read_byte.html
 //! [`progmem!`]: macro.progmem.html
 //! [`avr-libc`]: https://crates.io/crates/avr-libc
 //! [avr]: https://en.wikipedia.org/wiki/AVR_microcontrollers
@@ -446,7 +446,7 @@ macro_rules! progmem {
 /// Also general Rust pointer dereferencing constraints apply, i.e. it must not
 /// be dangling.
 ///
-pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
+pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 	cfg_if! {
 		if #[cfg(target_arch = "avr")] {
 			// Only addresses below the 64 KiB limit are supported!
@@ -491,8 +491,8 @@ pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
 
 /// Read an array of type `T` from progmem into data array.
 ///
-/// This function uses the above byte-wise `read_progmem_byte` function instead
-/// of the looped assembly of `read_progmem_asm_loop_raw`.
+/// This function uses the above byte-wise `read_byte` function instead
+/// of the looped assembly of `read_asm_loop_raw`.
 ///
 ///
 /// # Safety
@@ -510,7 +510,7 @@ pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
 /// However alignment is not strictly required for AVR, since the read/write is
 /// done byte-wise.
 ///
-unsafe fn read_progmem_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
+unsafe fn read_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
 	// Convert to byte pointers
@@ -532,15 +532,15 @@ unsafe fn read_progmem_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 	for i in 0..size_bytes {
 		let i: isize = i.into();
 
-		let value = read_progmem_byte(p_addr_bytes.offset(i));
+		let value = read_byte(p_addr_bytes.offset(i));
 		out_bytes.offset(i).write(value);
 	}
 }
 
 /// Read an array of type `T` from progmem into data array.
 ///
-/// This function uses the optimized `read_progmem_asm_loop_raw` with a looped
-/// assembly instead of byte-wise `read_progmem_byte` function.
+/// This function uses the optimized `read_asm_loop_raw` with a looped
+/// assembly instead of byte-wise `read_byte` function.
 ///
 ///
 /// # Safety
@@ -559,7 +559,7 @@ unsafe fn read_progmem_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// done byte-wise, but the non-AVR fallback dose actually use
 /// `core::ptr::copy` and therefore the pointers must be aligned.
 ///
-unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
+unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 
 	// Here are the general requirements essentially required by the AVR-impl
 	// However, assume, the non-AVR version is only used in tests, it makes a
@@ -651,8 +651,8 @@ unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 
 /// Read an array of type `T` from progmem into data array.
 ///
-/// This function uses either the optimized `read_progmem_asm_loop_raw` with a
-/// looped assembly instead of byte-wise `read_progmem_byte` function depending
+/// This function uses either the optimized `read_asm_loop_raw` with a
+/// looped assembly instead of byte-wise `read_byte` function depending
 /// whether the `lpm-asm-loop` crate feature is set.
 ///
 ///
@@ -672,14 +672,14 @@ unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 /// might be done actually use `core::ptr::copy` and therefore the pointers
 /// must be aligned.
 ///
-unsafe fn read_progmem_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
+unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
 	cfg_if!{
 		if #[cfg(feature = "lpm-asm-loop")] {
-			read_progmem_asm_loop_raw(p_addr, out, len)
+			read_asm_loop_raw(p_addr, out, len)
 		} else {
-			read_progmem_byte_loop_raw(p_addr, out, len)
+			read_byte_loop_raw(p_addr, out, len)
 		}
 	}
 }
@@ -713,7 +713,7 @@ unsafe fn read_progmem_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// `read_value` might be a good alternative.
 ///
 #[cfg_attr(feature = "dev", inline(never))]
-pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
+pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 	assert_eq!(p.len(), out.len());
 	assert!(p.len() <= u8::MAX as usize);
 
@@ -721,7 +721,7 @@ pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 	let out_bytes: *mut u8 = &mut out[0];
 	let len: u8 = out.len() as u8;
 
-	read_progmem_value_raw(p_addr, out_bytes, len);
+	read_value_raw(p_addr, out_bytes, len);
 }
 
 
@@ -734,7 +734,7 @@ pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 /// Notice that `T` might be also something like `[T, N]` so that in fact
 /// entire arrays can be loaded using this function. Alternatively if the the
 /// size of an array can not be known at compile time (i.e. a slice) there is
-/// also the `read_progmem_slice` function, but it requires proper
+/// also the [`read_slice`] function, but it requires proper
 /// initialization upfront.
 ///
 ///
@@ -758,8 +758,11 @@ pub unsafe fn read_progmem_slice(p: &[u8], out: &mut [u8]) {
 /// be UB if not. If you don't want to initialize the data upfront, the
 /// `read_value` might be a good alternative.
 ///
+/// [`read_byte`]: fn.read_byte.html
+/// [`read_slice`]: fn.read_slice.html
+///
 #[cfg_attr(feature = "dev", inline(never))]
-pub unsafe fn read_value<T>(p: &T) -> T
+pub unsafe fn read_value<T>(p_addr: *const T) -> T
 		where T: Sized + Copy {
 
 	let mut buffer = MaybeUninit::<T>::uninit();
@@ -767,10 +770,9 @@ pub unsafe fn read_value<T>(p: &T) -> T
 	// TODO add a local loop to process bigger chunks in 256 Byte blocks
 	assert!(size <= u8::MAX as usize);
 
-	let addr: *const T = p;
 	let res: *mut T = buffer.as_mut_ptr();
 
-	read_progmem_value_raw(addr, res, 1);
+	read_value_raw(p_addr, res, 1);
 
 	buffer.assume_init()
 }
