@@ -5,8 +5,8 @@
 
 Progmem utilities for the AVR architectures.
 
-This Crate provides unsafe utilities for working with with data stored in
-the program memory of an AVR micro-controller. And additionally a
+This crate provides unsafe utilities for working with data stored in
+the program memory of an AVR micro-controller. Additionally, it defines a
 'best-effort' safe wrapper struct [`ProgMem`] to simplify working with it.
 
 This crate is implemented only in Rust and some short assembly, it does NOT
@@ -19,24 +19,24 @@ compiler.
 
 This crate is specifically for [AVR-base micro-controllers][avr] such as
 the Arduino Uno (and some other Arduino boards, but not all), which have a
-modified Harvard architecture that is the strict separation between program
-code and data, while having special instruction to read and write to the
+modified Harvard architecture which implies the strict separation of program
+code and data while having special instructions to read and write to
 program memory.
 
-While all ordinary data is stored of course in the data domain, where it is
+While, of course, all ordinary data is stored in the data domain where it is
 perfectly usable, the harsh constraints of most AVR processors make it very
 appealing to use the program memory (also referred to as _progmem_) for
-storing constant values. However, due to the Harvard design those values
+storing constant values. However, due to the Harvard design, those values
 are not usable with normal instructions (i.e. those emitted from normal
-Rust code). Instead, special instructions are required to loaded data from
+Rust code). Instead, special instructions are required to load data from
 the program code domain, i.e. the `lpm` (load _from_ program memory)
 instruction. And because there is no way to emit it from Rust code, this
 crate uses inline assembly to emit that instruction.
 
-However, since there is nothing special about a pointer into program code
-which would differentiate it from normal data pointers it is entirely up to
-the programmer to ensure that these different 'pointer-type' are not
-accidentally mixed. In other words it is `unsafe` in the context of Rust.
+However, since a pointer into program code cannot be differentiated from a
+normal data pointer, it is entirely up to the programmer to ensure that
+these different 'pointer-types' are not accidentally mixed. In other words,
+this is `unsafe` in the context of Rust.
 
 
 # Loading Data from Program Memory
@@ -46,25 +46,25 @@ The first part of this crate simply provides a few functions (e.g.
 immutable) from the program memory into the data domain, so that
 sub-sequentially it is normal usable data, i.e. as owned data on the stack.
 
-Because, as aforementioned, a simple `*const u8` in Rust dose not specify
+Because, as aforementioned, a simple `*const u8` in Rust does not specify
 whether is lives in the program code domain or the data domain, all
 functions which simply load a given pointer from the program memory are
 inherently `unsafe`.
 
 Notice that using a `&u8` reference might make things rather worse than
 safe. Because keeping a pointer/reference/address into the program memory
-as Rust reference, might easily cause it to be dereferenced even in safe
-code, but since that address is only valid in the program code domain (and
+as Rust reference might easily cause it to be dereferenced, even in safe
+code. But since that address is only valid in the program code domain (and
 Rust doesn't know about it) it would illegally load the address from the
-data memory causing Undefined Behavior!
+data memory, causing **undefined behavior**!
 
 ## Example
 
 ```rust
 use avr_progmem::read_progmem_byte;
 
-// This static must never be directly dereferenced/accessed!
-// So a `let data: u8 = P_BYTE;` is Undefined Behavior!!!
+// This `static` must never be directly dereferenced/accessed!
+// So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
 /// Static byte stored in progmem!
 #[link_section = ".progmem"]
 static P_BYTE: u8 = b'A';
@@ -79,22 +79,22 @@ assert_eq!(b'A', data);
 
 # The best-effort Wrapper
 
-Since working with progmem data, is inherently unsafe and rather
+Since working with progmem data is inherently unsafe and rather
 difficult to do correctly, this crate introduces the best-effort 'safe'
 wrapper [`ProgMem`], that is supposed to only wrap data in progmem, thus
-offering only function to load its content using the progmem loading
+offering only functions to load its content using the progmem loading
 function.
 The latter are fine and safe, given that the wrapper type really contains
-date in the program memory. Therefore, to upkeep that invariant, the
+data in the program memory. Therefore, to keep that invariant up, the
 constructor is `unsafe`.
 
 Yet to make that also easier, this crate provides the [`progmem!`] macro
 (it has to be a macro), which will create a static variable in program
 memory for you and wrap it in the `ProgMem` struct. It will ensure that the
-static will be store in the program memory by defining the
+`static` will be stored in the program memory by defining the
 `#[link_section = ".progmem"]` attribute on it. This makes the load
-functions on that struct sound, and additionally prevents users to
-accidentally access directly that static, which since it is in progmem
+functions on that struct sound and additionally prevents users to
+accidentally access that `static` directly, which, since it is in progmem,
 would be fundamentally unsound.
 
 ## Example
@@ -129,7 +129,7 @@ on an AVR system but e.g. on x86 systems, and might want to test them
 there (well as far as it is possible), this crate also has a fallback
 implementation for all other architectures that are not AVR, falling back
 to a simple Rust `static` in the default data segment. And all the data
-loading functions will just dereference the pointed to data, assuming that
+loading functions will just dereference the pointed-to data, assuming that
 they just live in the default location.
 
 This fallback is perfectly safe on x86 and friend, and should also be fine
