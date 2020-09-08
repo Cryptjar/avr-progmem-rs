@@ -10,6 +10,20 @@ keywords = ["avr", "arduino", "progmem", "flash", "lpm", "pgm"]
 categories = ["embedded", "no-std", "hardware-support", "memory-management"]
 repository = "https://github.com/Cryptjar/avr-progmem-rs"
 
+
+# Profiles only needed for the examples to make them compile
+[profile.dev]
+panic = "abort"
+lto = true
+opt-level = "s"
+
+# Profiles only needed for the examples to make them compile
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = "s"
+
+
 [features]
 default = ["lpm-asm-loop"]
 # Enables the use of the `lpm r0, Z+` in an assembly loop, instead of the plain
@@ -22,3 +36,11 @@ dev = []
 
 [dependencies]
 cfg-if = "0.1.10"
+
+[dev-dependencies]
+# It is not yet available via crates.io
+arduino-uno = { git = "https://github.com/Rahix/avr-hal.git" }
+
+panic-halt = "0.2.0"
+ufmt = "0.1.0"
+
