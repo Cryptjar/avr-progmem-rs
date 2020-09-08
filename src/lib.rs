@@ -150,9 +150,9 @@
 //! a library that is not limited to AVR.
 //!
 //!
-//! [`ProgMem`]: struct.ProgMem.html
-//! [`read_byte`]: fn.read_byte.html
-//! [`progmem!`]: macro.progmem.html
+//! [`ProgMem`]: https://docs.rs/avr-progmem/latest/avr_progmem/struct.ProgMem.html
+//! [`read_byte`]: https://docs.rs/avr-progmem/latest/avr_progmem/fn.read_byte.html
+//! [`progmem!`]: https://docs.rs/avr-progmem/latest/avr_progmem/macro.progmem.html
 //! [`avr-libc`]: https://crates.io/crates/avr-libc
 //! [avr]: https://en.wikipedia.org/wiki/AVR_microcontrollers
 //!
