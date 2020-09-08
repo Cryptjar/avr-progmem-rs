@@ -352,7 +352,7 @@ macro_rules! progmem_internal {
 	} => {
 		// ProgMem must be stored in the progmem or text section!
 		// The link_section lets us define it.
-		#[link_section = ".progmem"]
+		#[cfg_attr(target_arch = "avr", link_section = ".progmem")]
 		// User attributes
 		$(#[$attr])*
 		// The actual static definition
@@ -452,6 +452,7 @@ pub unsafe fn read_progmem_byte(p_addr: *const u8) -> u8 {
 			// Only addresses below the 64 KiB limit are supported!
 			// Apparently this is of no concern for architectures with true
 			// 16-bit pointers.
+			// TODO: switch to use the extended lpm instruction if >64k
 			assert!(p_addr as usize <= u16::MAX as usize);
 
 			// Allocate a byte for the output (actually a single register r0
@@ -587,6 +588,7 @@ unsafe fn read_progmem_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 			// Only addresses below the 64 KiB limit are supported
 			// Apparently this is of no concern for architectures with true
 			// 16-bit pointers.
+			// TODO: switch to use the extended lpm instruction if >64k
 			assert!(p_addr as usize <= u16::MAX as usize);
 
 			// A loop to read a slice of T from prog memory
