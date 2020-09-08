@@ -42,7 +42,7 @@ this is `unsafe` in the context of Rust.
 # Loading Data from Program Memory
 
 The first part of this crate simply provides a few functions (e.g.
-[`read_progmem_byte`]) to load constant data (i.e. a Rust `static` that is
+[`read_byte`]) to load constant data (i.e. a Rust `static` that is
 immutable) from the program memory into the data domain, so that
 sub-sequentially it is normal usable data, i.e. as owned data on the stack.
 
@@ -61,7 +61,7 @@ data memory, causing **undefined behavior**!
 ## Example
 
 ```rust
-use avr_progmem::read_progmem_byte;
+use avr_progmem::read_byte;
 
 // This `static` must never be directly dereferenced/accessed!
 // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
@@ -72,7 +72,7 @@ static P_BYTE: u8 = b'A';
 // Load the byte from progmem
 // Here, it is sound, because due to the link_section it is indeed in the
 // program code memory.
-let data: u8 = unsafe { read_progmem_byte(&P_BYTE) };
+let data: u8 = unsafe { read_byte(&P_BYTE) };
 assert_eq!(b'A', data);
 ```
 
@@ -139,7 +139,7 @@ a library that is not limited to AVR.
 
 
 [`ProgMem`]: struct.ProgMem.html
-[`read_progmem_byte`]: fn.read_progmem_byte.html
+[`read_byte`]: fn.read_byte.html
 [`progmem!`]: macro.progmem.html
 [`avr-libc`]: https://crates.io/crates/avr-libc
 [avr]: https://en.wikipedia.org/wiki/AVR_microcontrollers
