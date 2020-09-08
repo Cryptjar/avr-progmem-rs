@@ -6,7 +6,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 description = "Progmem utilities for the AVR architectures"
-keywords = ["avr", "arduino", "progmem", "flash", "pgm"]
+keywords = ["avr", "arduino", "progmem", "flash", "lpm", "pgm"]
 categories = ["embedded", "no-std", "hardware-support", "memory-management"]
 repository = "https://github.com/Cryptjar/avr-progmem-rs"
 
