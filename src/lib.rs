@@ -247,6 +247,13 @@ impl<T> ProgMem<T> {
 impl<T: Copy> ProgMem<T> {
 	/// Read the inner value from progmem and return a regular value.
 	///
+	/// # Panics
+	///
+	/// This method panics, if the size of the value (i.e. `size_of::<T>()`)
+	/// is beyond 255 bytes.
+	/// Actually, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
+	///
 	pub fn load(&self) -> T {
 		// Get the actual address of the value to load
 		let p_addr = &self.0;
@@ -285,6 +292,11 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	/// This method panics, if the given index `idx` is grater or equal to the
 	/// length `N` of the inner type.
 	///
+	/// This method also panics, if the size of the value (i.e. `size_of::<T>()`)
+	/// is beyond 255 bytes.
+	/// Actually, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
+	///
 	pub fn load_at(&self, idx: usize) -> T {
 		// Just take a reference to the selected element.
 		// Notice that this will execute a bounds check.
@@ -319,6 +331,11 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	/// This method panics, if the given index `idx` is grater or equal to the
 	/// length `N` of the inner array, or the end index `idx+M` is grater than
 	/// the length `N` of the inner array.
+	///
+	/// This method also panics, if the size of the value (i.e. `size_of::<[T;M]>()`)
+	/// is beyond 255 bytes.
+	/// Actually, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
 	///
 	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T;M] {
 		assert!(M <= N);
@@ -749,6 +766,11 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// This function panics if the given slices `p` and `out` have a different
 /// lengths.
 ///
+/// This function also panics, if the size of the value (i.e. `p.len() * size_of::<T>()`)
+/// is beyond 255 bytes.
+/// Actually, this is currently just a implementation limitation, which may
+/// be lifted in the future.
+///
 ///
 /// # Safety
 ///
@@ -846,6 +868,13 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 /// assert_eq!(b"World", &data);
 /// ```
 ///
+/// # Panics
+///
+/// This function panics, if the size of the value (i.e. `size_of::<T>()`)
+/// is beyond 255 bytes.
+/// Actually, this is currently just a implementation limitation, which may
+/// be lifted in the future.
+///
 ///
 /// # Safety
 ///
@@ -873,15 +902,32 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 pub unsafe fn read_value<T>(p_addr: *const T) -> T
 		where T: Sized + Copy {
 
+	// The use of an MaybeUninit allows us to correctly allocate the space
+	// required to hold one `T`, whereas we correctly comunicate that it is
+	// uninitialized to the compiler.
+	//
+	// The alternative of using a [0u8; size_of::<T>()] is actually much more
+	// cumbersome as it also removes the type inference of `read_value_raw` and
+	// still requires a `transmute` in the end.
 	let mut buffer = MaybeUninit::<T>::uninit();
+
 	let size = size_of::<T>();
 	// TODO add a local loop to process bigger chunks in 256 Byte blocks
 	assert!(size <= u8::MAX as usize);
 
 	let res: *mut T = buffer.as_mut_ptr();
 
+	// The soundness of this call is directly derived from the prerequisite as
+	// defined by the Safety section of this function.
+	//
+	// Additionally, the use of the MaybeUninit there is also sound, because it
+	// only written to and never read and not even a Rust reference is created
+	// to it.
 	read_value_raw(p_addr, res, 1);
 
+	// After `read_value_raw` returned, it wrote an entire `T` into the `res`
+	// pointer, which is baked by this `buffer`. Thus it is now properly
+	// initialized, and this call is sound.
 	buffer.assume_init()
 }
 
