@@ -150,6 +150,29 @@
 //! a library that is not limited to AVR.
 //!
 //!
+//! # Implementation Limitations
+//!
+//! Aside from what has been already been covered, the current implementation
+//! has two further limitations.
+//!
+//! First, since this crate uses an inline assembly loop on a 8-bit
+//! architecture, the loop counter only allows values up to 255. This means
+//! that not more that 255 bytes can be loaded at once with any of the methods
+//! of this crate. However, this only applies to a single continuous load
+//! operation, so for instance `ProgMem<[u8;1024]>::load()` will panic, but
+//! accessing such a big type in smaller chunks e.g.
+//! `ProgMem<[u8;1024]>::load_sub_array::<[u8;128]>(512)` is perfectly fine
+//! because the to be loaded type `[u8;128]` is only 128 bytes in size.
+//!
+//! Second, since this crate only uses the `lpm` instruction, which is limited
+//! by a 16-bit pointer, this crate may only be used with data stored in the
+//! lower 64 kiB of program memory. Since this property has not be tested it is
+//! unclear whether it will cause a panic or right-up undefined behavior, so be
+//! very wary when working with AVR chips having more then 64 kiB of program
+//! memory.
+//! This second restriction, of course, dose not apply to non-AVR architectures.
+//!
+//!
 //! [`ProgMem`]: https://docs.rs/avr-progmem/latest/avr_progmem/struct.ProgMem.html
 //! [`read_byte`]: https://docs.rs/avr-progmem/latest/avr_progmem/fn.read_byte.html
 //! [`progmem!`]: https://docs.rs/avr-progmem/latest/avr_progmem/macro.progmem.html
@@ -251,8 +274,17 @@ impl<T: Copy> ProgMem<T> {
 	///
 	/// This method panics, if the size of the value (i.e. `size_of::<T>()`)
 	/// is beyond 255 bytes.
-	/// Actually, this is currently just a implementation limitation, which may
+	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
+	///
+	/// Also notice, if you really hit this limit, you would need 256+ bytes on
+	/// your stack, on the Arduino Uno (at least) that means that you might be
+	/// close to stack overflow. Thus it might be better to restructure your
+	/// data, so you can store it as an array of something, than you can use
+	/// the [`load_at`] and [`load_sub_array`] methods instead.
+	///
+	/// [`load_at`]: struct.ProgMem.html#method.load_at
+	/// [`load_sub_array`]: struct.ProgMem.html#method.load_sub_array
 	///
 	pub fn load(&self) -> T {
 		// Get the actual address of the value to load
@@ -270,7 +302,7 @@ impl<T: Copy> ProgMem<T> {
 	///
 	/// Notice that the returned pointer is indeed a pointer into the progmem
 	/// domain! It may never be dereferenced via the default Rust operations.
-	/// That means a `unsafe{*pm.get_inner_ptr()}` is Undefined Behavior!
+	/// That means a `unsafe{*pm.get_inner_ptr()}` is **undefined behavior**!
 	///
 	pub fn ptr(&self) -> *const T {
 		&self.0
@@ -294,7 +326,7 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	///
 	/// This method also panics, if the size of the value (i.e. `size_of::<T>()`)
 	/// is beyond 255 bytes.
-	/// Actually, this is currently just a implementation limitation, which may
+	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
 	///
 	pub fn load_at(&self, idx: usize) -> T {
@@ -334,7 +366,7 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	///
 	/// This method also panics, if the size of the value (i.e. `size_of::<[T;M]>()`)
 	/// is beyond 255 bytes.
-	/// Actually, this is currently just a implementation limitation, which may
+	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
 	///
 	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T;M] {
@@ -768,7 +800,7 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 ///
 /// This function also panics, if the size of the value (i.e. `p.len() * size_of::<T>()`)
 /// is beyond 255 bytes.
-/// Actually, this is currently just a implementation limitation, which may
+/// However, this is currently just a implementation limitation, which may
 /// be lifted in the future.
 ///
 ///
@@ -872,7 +904,7 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 ///
 /// This function panics, if the size of the value (i.e. `size_of::<T>()`)
 /// is beyond 255 bytes.
-/// Actually, this is currently just a implementation limitation, which may
+/// However, this is currently just a implementation limitation, which may
 /// be lifted in the future.
 ///
 ///
