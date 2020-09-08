@@ -352,7 +352,7 @@ macro_rules! progmem {
 	// Match private (not pub) definitions.
 	($(#[$attr:meta])* static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
 		// use `()` to explicitly forward the information about private items
-		$crate::progmem_internal!($(#[$attr])* () static ref $N : $T = $e;);
+		$crate::progmem_internal!($(#[$attr])* () static $N : $T = $e;);
 		// Recursive call to allow multiple items in macro invocation
 		$crate::progmem!($($t)*);
 	};
