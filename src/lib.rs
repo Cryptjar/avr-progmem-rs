@@ -433,6 +433,28 @@ macro_rules! progmem {
 /// This function reads just a single byte from the program code memory domain.
 /// Thus this is essentially a Rust function around the AVR `lpm` instruction.
 ///
+/// If you need to read from an array you might use [`read_slice`] or
+/// just generally for any value (including arrays) [`read_value`].
+///
+/// ## Example
+///
+/// ```
+/// use avr_progmem::read_byte;
+///
+/// // This static must never be directly dereferenced/accessed!
+/// // So a `let data: u8 = P_BYTE;` is Undefined Behavior!!!
+/// /// Static byte stored in progmem!
+/// #[link_section = ".progmem"]
+/// static P_BYTE: u8 = b'A';
+///
+/// // Load the byte from progmem
+/// // Here, it is sound, because due to the link_section it is indeed in the
+/// // program code memory.
+/// let data: u8 = unsafe { read_byte(&P_BYTE) };
+/// assert_eq!(b'A', data);
+/// ```
+///
+///
 /// # Safety
 ///
 /// The given point must be valid in the program domain which in AVR normal
@@ -445,6 +467,9 @@ macro_rules! progmem {
 ///
 /// Also general Rust pointer dereferencing constraints apply, i.e. it must not
 /// be dangling.
+///
+/// [`read_slice`]: fn.read_slice.html
+/// [`read_value`]: fn.read_value.html
 ///
 pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 	cfg_if! {
@@ -691,6 +716,39 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// byte-wise assembly function which is looped outside depending on
 /// whether the `lpm-asm-loop` crate feature is set or not.
 ///
+/// If you need to read just a single byte you might use [`read_byte`] or
+/// just generally for any value (including arrays) [`read_value`].
+///
+/// ## Example
+///
+/// ```
+/// use avr_progmem::read_slice;
+///
+/// // This static must never be directly dereferenced/accessed!
+/// // So a `let data: [u8;11] = P_ARRAY;` is Undefined Behavior!!!
+/// // Also notice the `*` in front of the string, because we want to store the
+/// // data, not just a reference!
+/// /// Static bytes stored in progmem!
+/// #[link_section = ".progmem"]
+/// static P_ARRAY: [u8;11] = *b"Hello World";
+///
+/// // Notice since we use a sub-slice the data better is pre-initialized even
+/// // tho we will override it.
+/// let mut data = [0u8; 5];
+///
+/// // Load the bytes from progmem
+/// // Here, it is sound, because due to the link_section it is indeed in the
+/// // program code memory.
+/// unsafe { read_slice(&P_ARRAY[0..5], &mut data[..]) };
+/// assert_eq!(b"Hello", &data);
+/// ```
+///
+///
+/// # Panics
+///
+/// This function panics if the given slices `p` and `out` have a different
+/// lengths.
+///
 ///
 /// # Safety
 ///
@@ -711,6 +769,9 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// Also notice, that the output slice must be correctly initialized, it would
 /// be UB if not. If you don't want to initialize the data upfront, the
 /// `read_value` might be a good alternative.
+///
+/// [`read_byte`]: fn.read_byte.html
+/// [`read_value`]: fn.read_value.html
 ///
 #[cfg_attr(feature = "dev", inline(never))]
 pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
@@ -737,18 +798,65 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 /// also the [`read_slice`] function, but it requires proper
 /// initialization upfront.
 ///
+/// If you need to read just a single byte you might use [`read_byte`].
+///
+/// ## Example
+///
+/// ```
+/// use avr_progmem::read_value;
+///
+/// // This static must never be directly dereferenced/accessed!
+/// // So a `let data: [u8;11] = P_ARRAY;` is Undefined Behavior!!!
+/// // Also notice the `*` in front of the string, because we want to store the
+/// // data, not just a reference!
+/// /// Static bytes stored in progmem!
+/// #[link_section = ".progmem"]
+/// static P_ARRAY: [u8;11] = *b"Hello World";
+///
+/// // Load the bytes from progmem
+/// // Here, it is sound, because due to the link_section it is indeed in the
+/// // program code memory.
+/// let data: [u8;11] = unsafe { read_value(&P_ARRAY) };
+/// assert_eq!(b"Hello World", &data);
+/// ```
+///
+/// Also statically sized sub-arrays can be loaded using this function:
+///
+/// ```
+/// use std::convert::TryInto;
+/// use avr_progmem::read_value;
+///
+/// /// Static bytes stored in progmem!
+/// #[link_section = ".progmem"]
+/// static P_ARRAY: [u8;11] = *b"Hello World";
+///
+/// // Get a sub-array reference without dereferencing it
+///
+/// // Make sure that we convert from &[T] directly to &[T;M] without
+/// // constructing an actual [T;M], because we MAY NOT LOAD THE DATA!
+/// // Also notice, that this sub-slicing does ensure that the bound are
+/// // correct.
+/// let slice: &[u8] = &P_ARRAY[6..];
+/// let array: &[u8;5] = slice.try_into().unwrap();
+///
+/// // Load the bytes from progmem
+/// // Here, it is sound, because due to the link_section it is indeed in the
+/// // program code memory.
+/// let data: [u8;5] = unsafe { read_value(array) };
+/// assert_eq!(b"World", &data);
+/// ```
+///
 ///
 /// # Safety
 ///
-/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
-/// has the same basic requirements such as both pointers must be valid for
-/// dereferencing i.e. not dangling and both pointers must
-/// be valid to read or write, respectively, of `len` many elements of type `T`,
-/// i.e. `len * size_of::<T>()` bytes.
+/// This call is analog to `core::ptr::copy` thus it
+/// has the same basic requirements such as the pointer must be valid for
+/// dereferencing i.e. not dangling and the pointer must
+/// be valid to read one entire value of type `T`,
+/// i.e. `size_of::<T>()` bytes.
 ///
 /// Additionally, `p_addr` must be a valid pointer into the program memory
-/// domain. And `out` must be valid point to a writable location in the data
-/// memory.
+/// domain.
 ///
 /// While the alignment is not strictly required for AVR, the non-AVR fallback
 /// might be done actually use `core::ptr::copy` and therefore the pointers
