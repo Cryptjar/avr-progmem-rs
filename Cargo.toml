@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Cryptjar <cryptjar@junk.studio>"]
 edition = "2018"
 
+description = "Progmem utilities for the AVR architectures"
+keywords = ["avr", "arduino", "progmem", "flash", "pgm"]
+categories = ["embedded", "no-std", "hardware-support", "memory-management"]
+repository = "https://github.com/Cryptjar/avr-progmem-rs"
+
 [features]
 default = ["lpm-asm-loop"]
 # Enables the use of the `lpm r0, Z+` in an assembly loop, instead of the plain
