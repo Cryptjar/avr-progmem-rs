@@ -37,10 +37,13 @@ dev = []
 [dependencies]
 cfg-if = "0.1.10"
 
-[dev-dependencies]
-# It is not yet available via crates.io
-arduino-uno = { git = "https://github.com/Rahix/avr-hal.git" }
 
+[dev-dependencies]
 panic-halt = "0.2.0"
 ufmt = "0.1.0"
+
+[dev-dependencies.arduino-uno]
+# It is not yet available via crates.io
+git = "https://github.com/Rahix/avr-hal.git"
+rev = "0c6cf1675c2724354f1adeaeee69992acd371e80"
 
