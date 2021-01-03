@@ -66,7 +66,7 @@ use avr_progmem::read_byte;
 // This `static` must never be directly dereferenced/accessed!
 // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
 /// Static byte stored in progmem!
-#[link_section = ".progmem"]
+#[link_section = ".progmem.data"]
 static P_BYTE: u8 = b'A';
 
 // Load the byte from progmem
@@ -92,7 +92,7 @@ Yet to make that also easier, this crate provides the [`progmem!`] macro
 (it has to be a macro), which will create a static variable in program
 memory for you and wrap it in the `ProgMem` struct. It will ensure that the
 `static` will be stored in the program memory by defining the
-`#[link_section = ".progmem"]` attribute on it. This makes the load
+`#[link_section = ".progmem.data"]` attribute on it. This makes the load
 functions on that struct sound and additionally prevents users to
 accidentally access that `static` directly, which, since it is in progmem,
 would be fundamentally unsound.
@@ -104,7 +104,7 @@ use avr_progmem::progmem;
 
 // It will be wrapped in the ProgMem struct and expand to:
 // ```
-// #[link_section = ".progmem"]
+// #[link_section = ".progmem.data"]
 // static P_BYTE: ProgMem<u8> = unsafe { ProgMem::new(b'A') };
 // ```
 // Thus it is impossible for safe Rust to directly dereference/access it!
