@@ -584,6 +584,7 @@ pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 /// However alignment is not strictly required for AVR, since the read/write is
 /// done byte-wise.
 ///
+#[allow(dead_code)]
 unsafe fn read_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
