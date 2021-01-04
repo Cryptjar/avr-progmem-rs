@@ -10,6 +10,7 @@ keywords = ["avr", "arduino", "flash", "lpm", "pgm"]
 categories = ["embedded", "no-std", "hardware-support", "memory-management"]
 repository = "https://github.com/Cryptjar/avr-progmem-rs"
 
+exclude = ["/.cargo/"]
 
 # Profiles only needed for the examples to make them compile
 [profile.dev]
