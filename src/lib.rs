@@ -78,7 +78,7 @@
 //! // This `static` must never be directly dereferenced/accessed!
 //! // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
 //! /// Static byte stored in progmem!
-//! #[link_section = ".progmem"]
+//! #[link_section = ".progmem.data"]
 //! static P_BYTE: u8 = b'A';
 //!
 //! // Load the byte from progmem
@@ -104,7 +104,7 @@
 //! (it has to be a macro), which will create a static variable in program
 //! memory for you and wrap it in the `ProgMem` struct. It will ensure that the
 //! `static` will be stored in the program memory by defining the
-//! `#[link_section = ".progmem"]` attribute on it. This makes the load
+//! `#[link_section = ".progmem.data"]` attribute on it. This makes the load
 //! functions on that struct sound and additionally prevents users to
 //! accidentally access that `static` directly, which, since it is in progmem,
 //! would be fundamentally unsound.
@@ -116,7 +116,7 @@
 //!
 //! // It will be wrapped in the ProgMem struct and expand to:
 //! // ```
-//! // #[link_section = ".progmem"]
+//! // #[link_section = ".progmem.data"]
 //! // static P_BYTE: ProgMem<u8> = unsafe { ProgMem::new(b'A') };
 //! // ```
 //! // Thus it is impossible for safe Rust to directly dereference/access it!
@@ -199,7 +199,7 @@ use cfg_if::cfg_if;
 /// 'best-effort' notation).
 ///
 /// However, there is a rather simple way to make is sound, and that is defining
-/// the `#[link_section = ".progmem"]` (or `".text"`) on a static that contains
+/// the `#[link_section = ".progmem.data"]` (or `".text"`) on a static that contains
 /// this struct. And since its that simple, a macro `progmem!` is provided that
 /// will ensure this and should be always used to obtain a `ProgMem` instance
 /// in the first place.
@@ -252,7 +252,7 @@ impl<T> ProgMem<T> {
 	///
 	/// That means that this function is only sound to call, if the value is
 	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem"]`.
+	/// `#[link_section = ".progmem.data"]`.
 	///
 	/// However, the above requirement only applies to the AVR architecture
 	/// (`#[cfg(target_arch = "avr")]`), because otherwise normal data access
@@ -401,7 +401,7 @@ macro_rules! progmem_internal {
 	} => {
 		// ProgMem must be stored in the progmem or text section!
 		// The link_section lets us define it.
-		#[cfg_attr(target_arch = "avr", link_section = ".progmem")]
+		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
 		// User attributes
 		$(#[$attr])*
 		// The actual static definition
@@ -493,7 +493,7 @@ macro_rules! progmem {
 /// // This static must never be directly dereferenced/accessed!
 /// // So a `let data: u8 = P_BYTE;` is Undefined Behavior!!!
 /// /// Static byte stored in progmem!
-/// #[link_section = ".progmem"]
+/// #[link_section = ".progmem.data"]
 /// static P_BYTE: u8 = b'A';
 ///
 /// // Load the byte from progmem
@@ -512,7 +512,7 @@ macro_rules! progmem {
 /// Typically only function pointers (which make no sense here) and pointer to
 /// or into statics that are defined to be stored into progmem are valid.
 /// For instance, a valid progmem statics would be one, that is attributed with
-/// `#[link_section = ".progmem"]`.
+/// `#[link_section = ".progmem.data"]`.
 ///
 /// Also general Rust pointer dereferencing constraints apply, i.e. it must not
 /// be dangling.
@@ -584,6 +584,7 @@ pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 /// However alignment is not strictly required for AVR, since the read/write is
 /// done byte-wise.
 ///
+#[allow(dead_code)]
 unsafe fn read_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 		where T: Sized + Copy {
 
@@ -778,7 +779,7 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// // Also notice the `*` in front of the string, because we want to store the
 /// // data, not just a reference!
 /// /// Static bytes stored in progmem!
-/// #[link_section = ".progmem"]
+/// #[link_section = ".progmem.data"]
 /// static P_ARRAY: [u8;11] = *b"Hello World";
 ///
 /// // Notice since we use a sub-slice the data better is pre-initialized even
@@ -864,7 +865,7 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 /// // Also notice the `*` in front of the string, because we want to store the
 /// // data, not just a reference!
 /// /// Static bytes stored in progmem!
-/// #[link_section = ".progmem"]
+/// #[link_section = ".progmem.data"]
 /// static P_ARRAY: [u8;11] = *b"Hello World";
 ///
 /// // Load the bytes from progmem
@@ -881,7 +882,7 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 /// use avr_progmem::read_value;
 ///
 /// /// Static bytes stored in progmem!
-/// #[link_section = ".progmem"]
+/// #[link_section = ".progmem.data"]
 /// static P_ARRAY: [u8;11] = *b"Hello World";
 ///
 /// // Get a sub-array reference without dereferencing it
