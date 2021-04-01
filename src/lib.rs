@@ -5,14 +5,6 @@
 // We need inline assembly for the `lpm` instruction.
 #![feature(llvm_asm)]
 
-// We need const generics, however the `const_generics` feature is reported as
-// incomplete, thus we actually use the `min_const_generics` feature, which is
-// sufficient for us. However, min_const_generics in turn fails to work with
-// `cargo doc`, thus when documenting we fallback to the incomplete
-// `const_generics` feature, because it has actual doc support.
-#![cfg_attr(doc, feature(const_generics))]
-#![cfg_attr(not(doc), feature(min_const_generics))]
-
 
 //!
 //! Progmem utilities for the AVR architectures.
@@ -227,7 +219,6 @@ use cfg_if::cfg_if;
 /// Therefore, only a immutable `static` in the correct memory segment can be
 /// considered to be a correct location for it.
 ///
-#[repr(transparent)]
 pub struct ProgMem<T>(T);
 
 impl<T> ProgMem<T> {
@@ -288,7 +279,7 @@ impl<T: Copy> ProgMem<T> {
 	///
 	pub fn load(&self) -> T {
 		// Get the actual address of the value to load
-		let p_addr = &self.0;
+		let p_addr = core::ptr::addr_of!(self.0);
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -305,7 +296,7 @@ impl<T: Copy> ProgMem<T> {
 	/// That means a `unsafe{*pm.get_inner_ptr()}` is **undefined behavior**!
 	///
 	pub fn ptr(&self) -> *const T {
-		&self.0
+		core::ptr::addr_of!(self.0)
 	}
 }
 
@@ -330,9 +321,19 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	/// be lifted in the future.
 	///
 	pub fn load_at(&self, idx: usize) -> T {
-		// Just take a reference to the selected element.
-		// Notice that this will execute a bounds check.
-		let addr: &T = &self.0[idx];
+		// First, do the bounds check.
+		assert!(idx < N, "Out-of-bounds");
+
+		// Take a pointer to the array => first element.
+		let begin: *const T = core::ptr::addr_of!(self.0) as *const T;
+
+		// Offset the point to the requested element.
+		// This should be safe, since did the bounds check, and thus the
+		// resulting address should not overflow, or we had a bogus value
+		// to begin with.
+		let addr: *const T = unsafe {
+			begin.offset(idx as isize)
+		};
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -370,23 +371,37 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	/// be lifted in the future.
 	///
 	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T;M] {
+		// Assert that we access a sub-array (or the entire)
 		assert!(M <= N);
 
-		// Make sure that we convert from &[T] to &[T;M] without constructing
-		// an actual [T;M], because we MAY NOT LOAD THE DATA YET!
-		// Also notice, that this sub-slicing dose ensure that the bound are
-		// correct.
-		let slice: &[T] = &self.0[start_idx..(start_idx+M)];
-		let array: &[T;M] = slice.try_into().unwrap();
+		// Do the bounds check, i.e. check that the end of the requested
+		// sub-array (start_idx + M) is less then or equal to N.
+		assert!(start_idx + M <= N, "Out-of-bounds");
+
+		// Take a pointer to the array => first element of self.
+		let begin: *const T = core::ptr::addr_of!(self.0) as *const T;
+
+		// Offset the point to the first requested element.
+		// This should be safe, since did the bounds check, and thus the
+		// resulting address should not overflow, not even if considering the
+		// end of the requested sub-array, and we are just getting the address
+		// of the first requested element.
+		let addr_start: *const T = unsafe {
+			begin.offset(start_idx as isize)
+		};
+
+		// Convert the pointer to the first requested element into a pointer to
+		// the entire requested (sub-)array.
+		// Notice, that bounds check at the top dose ensure that the entire
+		// sub-array (i.e. the end of it) are still in bounds and thus valid.
+		let sub_array_addr: *const [T;M] = addr_start as *const [T;M];
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
 		// in the progmem domain, which is what `read_value` requires from us.
 		//
-		// Also notice that the sub-slicing above gives us a bounds check.
-		//
 		unsafe {
-			read_value(array)
+			read_value(sub_array_addr)
 		}
 	}
 }
@@ -829,7 +844,7 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// [`read_value`]: fn.read_value.html
 ///
 #[cfg_attr(feature = "dev", inline(never))]
-#[deprecated = "Use read_value() instead"]
+#[deprecated = "Prefer to use read_value() instead"]
 pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 	assert_eq!(p.len(), out.len());
 	assert!(p.len() <= u8::MAX as usize);
@@ -963,15 +978,4 @@ pub unsafe fn read_value<T>(p_addr: *const T) -> T
 	// pointer, which is baked by this `buffer`. Thus it is now properly
 	// initialized, and this call is sound.
 	buffer.assume_init()
-}
-
-
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }
