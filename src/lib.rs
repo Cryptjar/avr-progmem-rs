@@ -829,6 +829,7 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// [`read_value`]: fn.read_value.html
 ///
 #[cfg_attr(feature = "dev", inline(never))]
+#[deprecated = "Use read_value() instead"]
 pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 	assert_eq!(p.len(), out.len());
 	assert!(p.len() <= u8::MAX as usize);

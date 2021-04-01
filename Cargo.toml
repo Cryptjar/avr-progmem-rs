@@ -12,6 +12,9 @@ repository = "https://github.com/Cryptjar/avr-progmem-rs"
 
 exclude = ["/.cargo/"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 # Profiles only needed for the examples to make them compile
 [profile.dev]
 panic = "abort"
