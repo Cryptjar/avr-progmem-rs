@@ -5,6 +5,9 @@
 // However, it seems in more recent Rust version there is no more `llvm_asm`.
 // And docs.rs uses the latest Rust version.
 #![cfg_attr(not(doc), feature(llvm_asm))]
+//
+// For string support, we need to convert from slice to array in const context.
+#![cfg_attr(not(doc), feature(const_raw_ptr_deref))]
 
 //!
 //! Progmem utilities for the AVR architectures.
@@ -187,6 +190,7 @@
 
 
 pub mod raw;
+pub mod string;
 mod wrapper;
 
 pub use wrapper::ProgMem;
