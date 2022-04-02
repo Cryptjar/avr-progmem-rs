@@ -2,10 +2,9 @@
 #![no_std]
 //
 // We need inline assembly for the `lpm` instruction.
-#![feature(llvm_asm)]
-//
-// For string support, we need to convert from slice to array in const context.
-#![feature(const_raw_ptr_deref)]
+// However, it seems in more recent Rust version there is no more `llvm_asm`.
+// And docs.rs uses the latest Rust version.
+#![cfg_attr(not(doc), feature(llvm_asm))]
 
 //!
 //! Progmem utilities for the AVR architectures.

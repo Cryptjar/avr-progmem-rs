@@ -50,7 +50,7 @@ use cfg_if::cfg_if;
 ///
 pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 	cfg_if! {
-		if #[cfg(target_arch = "avr")] {
+		if #[cfg(all(target_arch = "avr", not(doc)))] {
 			// Only addresses below the 64 KiB limit are supported!
 			// Apparently this is of no concern for architectures with true
 			// 16-bit pointers.
@@ -187,7 +187,7 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 
 
 	cfg_if! {
-		if #[cfg(target_arch = "avr")] {
+		if #[cfg(all(target_arch = "avr", not(doc)))] {
 			// Only addresses below the 64 KiB limit are supported
 			// Apparently this is of no concern for architectures with true
 			// 16-bit pointers.
