@@ -1,10 +1,9 @@
-
 // We don't need anything from std, and on AVR there is no std anyway.
 #![no_std]
-
+//
 // We need inline assembly for the `lpm` instruction.
 #![feature(llvm_asm)]
-
+//
 // We need const generics, however the `const_generics` feature is reported as
 // incomplete, thus we actually use the `min_const_generics` feature, which is
 // sufficient for us. However, min_const_generics in turn fails to work with
@@ -12,7 +11,6 @@
 // `const_generics` feature, because it has actual doc support.
 #![cfg_attr(doc, feature(const_generics))]
 #![cfg_attr(not(doc), feature(min_const_generics))]
-
 
 //!
 //! Progmem utilities for the AVR architectures.
@@ -181,9 +179,9 @@
 //!
 
 
+use core::convert::TryInto;
 use core::mem::size_of;
 use core::mem::MaybeUninit;
-use core::convert::TryInto;
 
 use cfg_if::cfg_if;
 
@@ -293,9 +291,7 @@ impl<T: Copy> ProgMem<T> {
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
 		// in the progmem domain, which is what `read_value` requires from us.
-		unsafe {
-			read_value(p_addr)
-		}
+		unsafe { read_value(p_addr) }
 	}
 
 	/// Return the raw pointer to the inner value.
@@ -310,8 +306,7 @@ impl<T: Copy> ProgMem<T> {
 }
 
 /// Utilities to work with an array in progmem.
-impl<T: Copy, const N: usize> ProgMem<[T;N]> {
-
+impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// Load a single element from the inner array.
 	///
 	/// This method is analog to a slice indexing `self.inner[idx]`, so the
@@ -340,9 +335,7 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 		//
 		// Also notice that the slice-indexing above gives us a bounds check.
 		//
-		unsafe {
-			read_value(addr)
-		}
+		unsafe { read_value(addr) }
 	}
 
 	/// Loads a sub array from the inner array.
@@ -369,15 +362,15 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
 	///
-	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T;M] {
+	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T; M] {
 		assert!(M <= N);
 
 		// Make sure that we convert from &[T] to &[T;M] without constructing
 		// an actual [T;M], because we MAY NOT LOAD THE DATA YET!
 		// Also notice, that this sub-slicing dose ensure that the bound are
 		// correct.
-		let slice: &[T] = &self.0[start_idx..(start_idx+M)];
-		let array: &[T;M] = slice.try_into().unwrap();
+		let slice: &[T] = &self.0[start_idx..(start_idx + M)];
+		let array: &[T; M] = slice.try_into().unwrap();
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -385,9 +378,7 @@ impl<T: Copy, const N: usize> ProgMem<[T;N]> {
 		//
 		// Also notice that the sub-slicing above gives us a bounds check.
 		//
-		unsafe {
-			read_value(array)
-		}
+		unsafe { read_value(array) }
 	}
 }
 
@@ -586,8 +577,9 @@ pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 ///
 #[allow(dead_code)]
 unsafe fn read_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
-		where T: Sized + Copy {
-
+where
+	T: Sized + Copy,
+{
 	// Convert to byte pointers
 	let p_addr_bytes = p_addr as *const u8;
 	let out_bytes = out as *mut u8;
@@ -635,14 +627,13 @@ unsafe fn read_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 /// `core::ptr::copy` and therefore the pointers must be aligned.
 ///
 unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
-
 	// Here are the general requirements essentially required by the AVR-impl
 	// However, assume, the non-AVR version is only used in tests, it makes a
 	// lot of sens to ensure the AVR requirements are held up.
 
 	// Loop head check, just return for zero iterations
 	if len == 0 || size_of::<T>() == 0 {
-		return
+		return;
 	}
 
 	// Get size in bytes of T
@@ -658,7 +649,7 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 	let size_bytes = size_bytes as u8;
 
 
-	cfg_if!{
+	cfg_if! {
 		if #[cfg(target_arch = "avr")] {
 			// Only addresses below the 64 KiB limit are supported
 			// Apparently this is of no concern for architectures with true
@@ -748,9 +739,10 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 /// must be aligned.
 ///
 unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
-		where T: Sized + Copy {
-
-	cfg_if!{
+where
+	T: Sized + Copy,
+{
+	cfg_if! {
 		if #[cfg(feature = "lpm-asm-loop")] {
 			read_asm_loop_raw(p_addr, out, len)
 		} else {
@@ -934,8 +926,9 @@ pub unsafe fn read_slice(p: &[u8], out: &mut [u8]) {
 ///
 #[cfg_attr(feature = "dev", inline(never))]
 pub unsafe fn read_value<T>(p_addr: *const T) -> T
-		where T: Sized + Copy {
-
+where
+	T: Sized + Copy,
+{
 	// The use of an MaybeUninit allows us to correctly allocate the space
 	// required to hold one `T`, whereas we correctly comunicate that it is
 	// uninitialized to the compiler.
@@ -963,15 +956,4 @@ pub unsafe fn read_value<T>(p_addr: *const T) -> T
 	// pointer, which is baked by this `buffer`. Thus it is now properly
 	// initialized, and this call is sound.
 	buffer.assume_init()
-}
-
-
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

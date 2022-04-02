@@ -1,0 +1,24 @@
+# Custom Formatting Configuration
+# See: https://github.com/rust-lang/rustfmt/blob/master/Configurations.md
+# Notice, you need a nightly toolchain for correctly formatting
+
+hard_tabs = true                   # Use true tabs, no spaces for indentation
+edition = "2018"                   # not necessary for `cargo fmt`, but seems reasonable to have
+merge_derives = false              # Do not combine separate #[derives]
+newline_style = "Unix"
+use_field_init_shorthand = true    # Enforce using shorthand
+
+# Unstable stuff, which is nice to have:
+unstable_features = true           # Opt-in into nightly features
+blank_lines_upper_bound = 3        # Allow up to 3 blank lines between items
+match_block_trailing_comma = true  # Always add a comma in matches
+combine_control_expr = false       # Put control expressions in block format
+force_multiline_blocks = true      # Use blocks for multiline code
+format_macro_matchers = true       # (try) formatting macro_rules
+format_strings = true              # Line break long strings
+imports_layout = "Vertical"        # Each item on a separate line
+imports_granularity = "Item"       # Use a single import per module
+group_imports = "StdExternalCrate" # Group by std, external, self
+reorder_impl_items = true          # Put types first in impl blocks
+struct_lit_single_line = false     # Each field on a separate line
+

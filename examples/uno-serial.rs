@@ -35,12 +35,10 @@
 #![cfg_attr(target_arch = "avr", no_std)]
 #![no_main]
 
-// Import a halting panic implementation for AVR
-#[cfg(target_arch = "avr")]
-use panic_halt as _;
 
-// Our library to be actually test here!
 use avr_progmem::progmem;
+#[cfg(target_arch = "avr")]
+use panic_halt as _; // halting panic implementation for AVR
 
 
 // The length of the below data block.
@@ -92,13 +90,12 @@ fn main() -> ! {
 	// Loop through the entire `TEXT` and print it char-by-char
 	let mut idx = 0;
 	loop {
-
 		printer.print(TEXT.load_at(idx) as char);
 
 		idx += 1;
 
 		if idx >= TEXT_LEN {
-			break
+			break;
 		}
 	}
 

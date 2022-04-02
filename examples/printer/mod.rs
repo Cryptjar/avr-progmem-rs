@@ -1,4 +1,3 @@
-
 //!
 //! Universal printer type.
 //!
@@ -27,6 +26,7 @@ impl Printer {
 		#[cfg(not(target_arch = "avr"))]
 		println!("{}", s);
 	}
+
 	pub fn print(&mut self, c: char) {
 		#[cfg(target_arch = "avr")]
 		ufmt::uwrite!(&mut self.0, "{}", c).void_unwrap();
@@ -35,4 +35,3 @@ impl Printer {
 		print!("{}", c);
 	}
 }
-
