@@ -1,5 +1,8 @@
 # avr-progmem
 
+[![Crates.io](https://img.shields.io/crates/v/avr-progmem.svg)](https://crates.io/crates/avr-progmem)
+[![API](https://docs.rs/avr-progmem/badge.svg)](https://docs.rs/avr-progmem)
+
 <!-- cargo-sync-readme start -->
 
 
