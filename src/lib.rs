@@ -450,6 +450,36 @@ macro_rules! progmem_internal {
 ///
 #[macro_export]
 macro_rules! progmem {
+	// Catch references rule, reference are evil!
+	// (well actually they are not, but most likely using them *is* a mistake)
+	(
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem $name:ident : & $ty:ty = $value:expr ;
+
+		$($rest:tt)*
+	) => {
+		// TODO: Consider whether to deny this entirely
+		//compile_error!("You really should not");
+
+		// Use an anonymous constant to scope the types used for the warning.
+		const _ : () = {
+			#[deprecated = "You should not use a reference type for progmem, because this way only the reference itself will be in progmem, whereas the underlying data will not be in progmem!"]
+			struct $name;
+
+			let _ = $name;
+		};
+
+		// Crate the progmem static via internal macro
+		$crate::progmem_internal!{
+			$(#[$attr])* $vis static progmem $name : & $ty = $value;
+		}
+
+		// Recursive call to allow multiple items in macro invocation
+		$crate::progmem!{
+			$($rest)*
+		}
+	};
+
 	// Standard rule
 	(
 		$( #[ $attr:meta ] )*
