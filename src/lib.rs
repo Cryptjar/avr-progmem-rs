@@ -392,8 +392,8 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 #[macro_export]
 macro_rules! progmem_internal {
 	{
-		$(#[$attr:meta])*
-		($($vis:tt)*) static $name:ident : $ty:ty = $value:expr ;
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem $name:ident : $ty:ty = $value:expr ;
 	} => {
 		// ProgMem must be stored in the progmem or text section!
 		// The link_section lets us define it.
@@ -401,7 +401,7 @@ macro_rules! progmem_internal {
 		// User attributes
 		$(#[$attr])*
 		// The actual static definition
-		$($vis)* static $name : $crate::ProgMem<$ty> =
+		$vis static $name : $crate::ProgMem<$ty> =
 			unsafe {
 				// This call is safe, be cause we ensure with the above
 				// link_section attribute that this value is indeed in the
@@ -450,25 +450,25 @@ macro_rules! progmem_internal {
 ///
 #[macro_export]
 macro_rules! progmem {
-	// Match private (not pub) definitions.
-	($(#[$attr:meta])* static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-		// use `()` to explicitly forward the information about private items
-		$crate::progmem_internal!($(#[$attr])* () static $N : $T = $e;);
+	// Standard rule
+	(
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem $name:ident : $ty:ty = $value:expr ;
+
+		$($rest:tt)*
+	) => {
+		// Crate the progmem static via internal macro
+		$crate::progmem_internal!{
+			$(#[$attr])* $vis static progmem $name : $ty = $value;
+		}
+
 		// Recursive call to allow multiple items in macro invocation
-		$crate::progmem!($($t)*);
+		$crate::progmem!{
+			$($rest)*
+		}
 	};
-	// Match simple public (just pub) definitions.
-	($(#[$attr:meta])* pub static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-		$crate::progmem_internal!($(#[$attr])* (pub) static $N : $T = $e;);
-		// Recursive call to allow multiple items in macro invocation
-		$crate::progmem!($($t)*);
-	};
-	// Match public path (pub with path) definitions.
-	($(#[$attr:meta])* pub ($($vis:tt)+) static progmem $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-		$crate::progmem_internal!($(#[$attr])* (pub ($($vis)+)) static $N : $T = $e;);
-		// Recursive call to allow multiple items in macro invocation
-		$crate::progmem!($($t)*);
-	};
+
+	// Empty rule
 	() => ()
 }
 
