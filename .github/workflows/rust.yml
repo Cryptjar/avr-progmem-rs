@@ -1,0 +1,58 @@
+name: Rust
+
+on:
+  push:
+    branches:
+      - '**'        # matches every branch
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    # Simple Ubuntu image, we use rustup
+    runs-on: ubuntu-latest
+
+    # Matrix build, over stable vs nightly and features
+    strategy:
+        fail-fast: false
+        matrix:
+          rust: [nightly]
+          features: ["--", "--no-default-features", "--all-features"]
+          exclude:
+            # excludes --all-features on stable, because some features might
+            # require nightly Rust
+            - rust: stable
+              features: "--all-features"
+
+    # The steps
+    steps:
+      # Getting the code
+    - uses: actions/checkout@v2
+      # Getting AVR tools (such as `avr-gcc`)
+    - name: Install AVR toolchain
+      run: sudo apt install -y gcc-avr avr-libc
+      # Installing the selected Rust version
+    # Doesn't make sense with a pined toolchain
+    #- name: Install Rust ${{ matrix.rust }}
+    #  uses: actions-rs/toolchain@v1
+    #  with:
+    #    toolchain: ${{ matrix.rust }}
+    #    profile: minimal
+    #    override: true
+    #    components: rustfmt, rust-src
+      # Building on the default target (i.e. AVR)
+    - name: Build with defaults
+      run: cargo build --verbose ${{ matrix.features }}
+    - name: Build examples with defaults
+      run: cargo build --examples --verbose ${{ matrix.features }}
+      # Testing on the host target
+    - name: Clean local cargo-config
+      run: rm -f .cargo/config.toml
+    - name: Run tests
+      run: cargo test --verbose ${{ matrix.features }}
+    - name: Check formatting
+      if: ${{ matrix.rust == 'nightly' }}
+      run: cargo fmt -- --check
