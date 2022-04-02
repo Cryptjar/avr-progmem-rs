@@ -24,6 +24,11 @@
 //! of inline assembly, this crate may only be compiled using a **nightly Rust**
 //! compiler.
 //!
+//! Please, notice that at the time of writing (early 2022) the latest Rust
+//! compiler version that supports AVR is `nightly-2021-01-07` (over one year
+//! old), also see <https://github.com/rust-lang/compiler-builtins/issues/400>
+//!
+//!
 //!
 //! # AVR Memory
 //!
