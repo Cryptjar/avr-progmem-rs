@@ -17,10 +17,17 @@ depend on the [`avr-libc`] or any other C-library. However, due to the use
 of inline assembly, this crate may only be compiled using a **nightly Rust**
 compiler.
 
-Please, notice that at the time of writing (early 2022) the latest Rust
-compiler version that supports AVR is `nightly-2021-01-07` (over one year
-old), also see <https://github.com/rust-lang/compiler-builtins/issues/400>
+## MSRV
 
+This crate only works with a Rust `nightly-2021-01-07` compiler, which is,
+as of the time of writing (early 2022), still the latest version that
+supports AVR
+(see <https://github.com/rust-lang/compiler-builtins/issues/400>).
+So it is actually, the minimum and maximum supported version.
+All versions `0.2.x` will adhere to work with `nightly-2021-01-07`.
+
+Future versions such as `0.3.x` might required a new different Rust compiler
+version.
 
 
 # AVR Memory

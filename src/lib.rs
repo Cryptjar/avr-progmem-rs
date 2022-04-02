@@ -4,13 +4,6 @@
 // We need inline assembly for the `lpm` instruction.
 #![feature(llvm_asm)]
 //
-// We need const generics, however the `const_generics` feature is reported as
-// incomplete, thus we actually use the `min_const_generics` feature, which is
-// sufficient for us. However, min_const_generics in turn fails to work with
-// `cargo doc`, thus when documenting we fallback to the incomplete
-// `const_generics` feature, because it has actual doc support.
-#![cfg_attr(doc, feature(const_generics))]
-#![cfg_attr(not(doc), feature(min_const_generics))]
 
 //!
 //! Progmem utilities for the AVR architectures.
@@ -24,10 +17,17 @@
 //! of inline assembly, this crate may only be compiled using a **nightly Rust**
 //! compiler.
 //!
-//! Please, notice that at the time of writing (early 2022) the latest Rust
-//! compiler version that supports AVR is `nightly-2021-01-07` (over one year
-//! old), also see <https://github.com/rust-lang/compiler-builtins/issues/400>
+//! ## MSRV
 //!
+//! This crate only works with a Rust `nightly-2021-01-07` compiler, which is,
+//! as of the time of writing (early 2022), still the latest version that
+//! supports AVR
+//! (see <https://github.com/rust-lang/compiler-builtins/issues/400>).
+//! So it is actually, the minimum and maximum supported version.
+//! All versions `0.2.x` will adhere to work with `nightly-2021-01-07`.
+//!
+//! Future versions such as `0.3.x` might required a new different Rust compiler
+//! version.
 //!
 //!
 //! # AVR Memory
