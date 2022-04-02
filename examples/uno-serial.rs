@@ -105,7 +105,7 @@ fn main() -> ! {
 	printer.println("");
 	printer.println("DONE");
 
-	// It is very convinient to just exit on non-AVR platforms, otherwise users
+	// It is very convenient to just exit on non-AVR platforms, otherwise users
 	// might get the impression that the program hangs, whereas it already
 	// succeeded.
 	#[cfg(not(target_arch = "avr"))]
