@@ -2,14 +2,14 @@
 #![no_std]
 //
 // We need inline assembly for the `lpm` instruction.
-#![feature(llvm_asm)]
+// However, it seems in more recent Rust version there is no more `llvm_asm`.
+// And docs.rs uses the latest Rust version.
+#![cfg_attr(not(doc), feature(llvm_asm))]
 //
 // We need const generics, however the `const_generics` feature is reported as
 // incomplete, thus we actually use the `min_const_generics` feature, which is
-// sufficient for us. However, min_const_generics in turn fails to work with
-// `cargo doc`, thus when documenting we fallback to the incomplete
-// `const_generics` feature, because it has actual doc support.
-#![cfg_attr(doc, feature(const_generics))]
+// sufficient for us. However, `min_const_generics` in turn fails to work with
+// `cargo doc`.
 #![cfg_attr(not(doc), feature(min_const_generics))]
 
 //!
@@ -518,7 +518,7 @@ macro_rules! progmem {
 ///
 pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 	cfg_if! {
-		if #[cfg(target_arch = "avr")] {
+		if #[cfg(all(target_arch = "avr", not(doc)))] {
 			// Only addresses below the 64 KiB limit are supported!
 			// Apparently this is of no concern for architectures with true
 			// 16-bit pointers.
@@ -655,7 +655,7 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 
 
 	cfg_if! {
-		if #[cfg(target_arch = "avr")] {
+		if #[cfg(all(target_arch = "avr", not(doc)))] {
 			// Only addresses below the 64 KiB limit are supported
 			// Apparently this is of no concern for architectures with true
 			// 16-bit pointers.
