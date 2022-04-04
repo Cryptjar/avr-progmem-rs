@@ -3,28 +3,9 @@ use core::ops::Deref;
 
 
 
-/// Our own `core::array::TryFromSliceError`
-///
-/// Used in [`array_ref_try_from_slice`].
-// We need a local copy of this type, because we need to instantiate it, but it
-// has a private field.
-struct TryFromSliceError(());
+mod from_slice;
 
-/// Const version of `<&[T; N]>::try_from(&[T])`
-///
-/// Original Source:
-/// https://github.com/rust-lang/rust/blob/eb82facb1626166188d49599a3313fc95201f556/library/core/src/array/mod.rs#L203-L215
-const fn array_ref_try_from_slice<'a, T, const N: usize>(
-	slice: &[T],
-) -> Result<&[T; N], TryFromSliceError> {
-	if slice.len() == N {
-		let ptr = slice.as_ptr() as *const [T; N];
-		// SAFETY: ok because we just checked that the length fits
-		unsafe { Ok(&*ptr) }
-	} else {
-		Err(TryFromSliceError(()))
-	}
-}
+
 
 /// A string stored as byte array.
 ///
@@ -56,8 +37,8 @@ const fn array_ref_try_from_slice<'a, T, const N: usize>(
 /// let text: &str = &text_buffer; // Just derefs to `str`
 /// assert_eq!(text, "dai 大賢者 kenja")
 /// ```
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
 pub struct ByteString<const N: usize>(pub [u8; N]);
 
 impl<const N: usize> ByteString<N> {
@@ -68,7 +49,7 @@ impl<const N: usize> ByteString<N> {
 
 	/// Wraps the given byte slice
 	pub const fn from_bytes(bytes: &[u8]) -> Option<Self> {
-		let res = array_ref_try_from_slice(bytes);
+		let res = from_slice::array_ref_try_from_slice(bytes);
 
 		match res {
 			Ok(array) => Some(Self(*array)),
