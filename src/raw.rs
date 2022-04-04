@@ -141,6 +141,7 @@ where
 	}
 }
 
+
 /// Read an array of type `T` from progmem into data array.
 ///
 /// This function uses the optimized `read_asm_loop_raw` with a looped
@@ -163,6 +164,7 @@ where
 /// done byte-wise, but the non-AVR fallback dose actually use
 /// `core::ptr::copy` and therefore the pointers must be aligned.
 ///
+#[cfg_attr(feature = "dev", inline(never))]
 unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 	// Here are the general requirements essentially required by the AVR-impl
 	// However, assume, the non-AVR version is only used in tests, it makes a
@@ -194,29 +196,40 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 			// TODO: switch to use the extended lpm instruction if >64k
 			assert!(p_addr as usize <= u16::MAX as usize);
 
+			// Some dummy variables so we can define "output" for our assembly.
+			// In fact, we do not have outputs, but need to modify the
+			// registers, thus we just mark them as "outputs".
+			let mut _a: u8;
+			let mut _b: *const ();
+			let mut _c: *mut ();
+			let mut _d: u8;
+
 			// A loop to read a slice of T from prog memory
 			// The prog memory address (addr) is stored in the 16-bit address
 			// register Z (since this is the default register for the `lpm`
 			// instruction).
 			// The output data memory address (out) is stored in the 16-bit
 			// address register X, because Z is already used and Y seams to be
-			// used other wise or is callee-save, whatever, it emits more
+			// used otherwise or is callee-save, whatever, it emits more
 			// instructions by llvm.
 			//
 			// This loop appears in the assembly, because it allows to exploit
 			// `lpm 0, Z+` instruction that simultaneously increments the
-			// pointer.
+			// pointer, and allows to write a very compact loop.
 			llvm_asm!(
 				"
-					// load value from program memory at indirect Z into register 0
-					// and increment Z by one
-					lpm 0, Z+
-					// write register 0 to data memory at indirect X
-					// and increment X by one
-					st X+, 0
+					// load value from program memory at indirect Z into temp
+					// register $3 and post-increment Z by one
+					lpm $3, Z+
+
+					// write register $3 to data memory at indirect X
+					// and post-increment X by one
+					st X+, $3
+
 					// Decrement the loop counter in register $0 (size_bytes).
 					// If zero has been reached the equality flag is set.
 					subi $0, 1
+
 					// Check whether the end has not been reached and if so jump back.
 					// The end is reached if $0 (size_bytes) == 0, i.e. equality flag
 					// is set.
@@ -225,23 +238,20 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 					// Notice: 4 instructions = 8 Byte
 					brne -8
 				"
-				// No direct outputs
-				:
+				// Define all registers as outputs, so we may modify them
+				: "=r"(_a), "=z"(_b), "=x"(_c), "=r"(_d)
 				// Input the iteration count, input program memory address,
-				// and output data memory address
-				: "r"(size_bytes), "z"(p_addr), "x"(out)
-				// The register 0 is clobbered
-				: "0"
+				// and output data memory address (tied to the respective
+				// "output" registers
+				: "0"(size_bytes), "1"(p_addr), "2"(out)
+				// Mark condition-codes and memory as clobbered
+				: "cc", "memory"
 			);
 
 		} else {
-			// This is a non-AVR dummy.
-			// We have to assume that otherwise a normal data or text segment
-			// would be used, and thus that it is actually save to access it
-			// directly!
-
-			// Notice the above assumption fails and results in UB for any other
-			// Harvard architecture other than AVR.
+			// Here, we are on a non-AVR platform.
+			// We just use normal data or text segment, and thus that it is
+			// actually save to just access the data.
 
 			// Now, just copy the bytes from p_addr to out
 			// It is save by the way, because we require the user to give use
@@ -371,10 +381,6 @@ where
 /// While the alignment is not strictly required for AVR, the non-AVR fallback
 /// might be done actually use `core::ptr::copy` and therefore the pointers
 /// must be aligned.
-///
-/// Also notice, that the output slice must be correctly initialized, it would
-/// be UB if not. If you don't want to initialize the data upfront, the
-/// `read_value` might be a good alternative.
 ///
 /// [`read_byte`]: fn.read_byte.html
 /// [`read_slice`]: fn.read_slice.html
