@@ -1,3 +1,4 @@
+use core::fmt;
 use core::ops::Deref;
 
 
@@ -83,6 +84,24 @@ impl<const N: usize> Deref for ByteString<N> {
 		core::str::from_utf8(&self.0).unwrap()
 	}
 }
+
+impl<const N: usize> fmt::Display for ByteString<N> {
+	fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+		write!(fmt, "{}", self.deref())
+	}
+}
+
+#[cfg(any(feature = "ufmt", doc))]
+#[doc(cfg(feature = "ufmt"))]
+impl<const N: usize> ufmt::uDisplay for ByteString<N> {
+	fn fmt<W: ?Sized>(&self, fmt: &mut ufmt::Formatter<W>) -> Result<(), W::Error>
+	where
+		W: ufmt::uWrite,
+	{
+		ufmt::uwrite!(fmt, "{}", self.deref())
+	}
+}
+
 
 /// Define a string in progmem
 ///

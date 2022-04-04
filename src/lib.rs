@@ -8,6 +8,9 @@
 //
 // For string support, we need to convert from slice to array in const context.
 #![cfg_attr(not(doc), feature(const_raw_ptr_deref))]
+//
+// Allows to document required crate features on items
+#![feature(doc_cfg)]
 
 //!
 //! Progmem utilities for the AVR architectures.

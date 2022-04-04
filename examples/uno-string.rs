@@ -94,6 +94,10 @@ fn main() -> ! {
 	printer.println(avr_progmem::progmem_str!("Just a lone literal progmem str"));
 	printer.println(avr_progmem::progmem_str!("And another one"));
 
+	// Using the ufmt impl
+	#[cfg(feature = "ufmt")]
+	ufmt::uwriteln!(&mut printer, "{}\r", UNICODE_TEXT.load()).unwrap();
+
 	// Print some final lines
 	printer.println("");
 	printer.println("--------------------------");

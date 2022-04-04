@@ -35,3 +35,27 @@ impl Printer {
 		print!("{}", c);
 	}
 }
+
+impl ufmt::uWrite for Printer {
+	type Error = void::Void;
+
+	fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
+		#[cfg(target_arch = "avr")]
+		ufmt::uwrite!(&mut self.0, "{}", s).void_unwrap();
+
+		#[cfg(not(target_arch = "avr"))]
+		println!("{}", s);
+
+		Ok(())
+	}
+
+	fn write_char(&mut self, c: char) -> Result<(), Self::Error> {
+		#[cfg(target_arch = "avr")]
+		ufmt::uwrite!(&mut self.0, "{}", c).void_unwrap();
+
+		#[cfg(not(target_arch = "avr"))]
+		print!("{}", c);
+
+		Ok(())
+	}
+}

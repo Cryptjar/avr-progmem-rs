@@ -29,25 +29,31 @@ opt-level = "s"
 
 
 [features]
-default = ["lpm-asm-loop"]
+default = ["lpm-asm-loop", "ufmt"]
 # Enables the use of the `lpm r0, Z+` in an assembly loop, instead of the plain
 # `lpm` instruction with a Rust loop.
 lpm-asm-loop = []
 # Enables some tweak to ease debugging, should not be use in production
 dev = []
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 cfg-if = "0.1.10"
+
+[dependencies.ufmt]
+version = "0.1.0"
+optional = true
 
 
 [dev-dependencies]
 panic-halt = "0.2.0"
 ufmt = "0.1.0"
 
+[dev-dependencies.void]
+version = "1.0"
+default-features = false
+
+
 [dev-dependencies.arduino-uno]
 # It is not yet available via crates.io
 git = "https://github.com/Rahix/avr-hal.git"
 rev = "0c6cf1675c2724354f1adeaeee69992acd371e80"
-
