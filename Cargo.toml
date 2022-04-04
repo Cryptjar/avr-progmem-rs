@@ -52,8 +52,18 @@ ufmt = "0.1.0"
 version = "1.0"
 default-features = false
 
+[dev-dependencies.avr-device]
+version = "0.3"
+features = ["atmega328p", "rt"]
 
-[dev-dependencies.arduino-uno]
+[dev-dependencies.arduino-hal]
 # It is not yet available via crates.io
 git = "https://github.com/Rahix/avr-hal.git"
-rev = "0c6cf1675c2724354f1adeaeee69992acd371e80"
+rev = "e897783816437a677aa577ddfdaa34e9a1e86d96"
+features = ["arduino-uno"]
+
+[dev-dependencies.atmega-hal]
+# It is not yet available via crates.io
+git = "https://github.com/Rahix/avr-hal.git"
+rev = "e897783816437a677aa577ddfdaa34e9a1e86d96"
+

@@ -10,11 +10,21 @@
 
 // Import the Arduino libraries, interestingly they don't cause problems perse
 // on other architectures. Through, we will not use there.
-use arduino_uno::prelude::*;
+use arduino_hal::port::mode::AnyInput;
+use arduino_hal::port::mode::Input;
+use arduino_hal::port::mode::Output;
+use arduino_hal::port::Pin;
+use arduino_hal::prelude::*;
 
 
 #[cfg(target_arch = "avr")]
-pub struct Printer(pub arduino_uno::Serial<arduino_uno::hal::port::mode::Floating>);
+pub struct Printer(
+	pub  arduino_hal::usart::Usart<
+		avr_device::atmega328p::USART0,
+		Pin<Input<AnyInput>, atmega_hal::port::PD0>,
+		Pin<Output, atmega_hal::port::PD1>,
+	>,
+);
 #[cfg(not(target_arch = "avr"))]
 pub struct Printer;
 

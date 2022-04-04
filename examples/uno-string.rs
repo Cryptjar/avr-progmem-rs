@@ -5,7 +5,7 @@
 
 // Define no_std only for AVR
 #![cfg_attr(target_arch = "avr", no_std)]
-#![no_main]
+#![cfg_attr(target_arch = "avr", no_main)]
 //
 // To unwrap the Option in const context
 #![feature(const_option)]
@@ -46,23 +46,17 @@ temporary DRAM necessary.
 mod printer;
 use printer::Printer;
 
-#[no_mangle]
+#[cfg_attr(target_arch = "avr", arduino_hal::entry)]
 fn main() -> ! {
 	let mut printer = {
 		#[cfg(target_arch = "avr")]
 		{
 			// Initialize the USB-Serial output on the Arduino Uno
 
-			let dp = arduino_uno::Peripherals::take().unwrap();
+			let dp = arduino_hal::Peripherals::take().unwrap();
+			let pins = arduino_hal::pins!(dp);
+			let serial = arduino_hal::default_serial!(dp, pins, 9600);
 
-			let mut pins = arduino_uno::Pins::new(dp.PORTB, dp.PORTC, dp.PORTD);
-
-			let serial = arduino_uno::Serial::new(
-				dp.USART0,
-				pins.d0,
-				pins.d1.into_output(&mut pins.ddr),
-				9600,
-			);
 			Printer(serial)
 		}
 		#[cfg(not(target_arch = "avr"))]
