@@ -198,8 +198,59 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		//
 		unsafe { read_value(array) }
 	}
+
+	/// Lazily iterate over all elements
+	///
+	/// Returns an iterator which lazily loads the elements one at a time
+	/// from progmem.
+	/// This means this iterator can be used to access huge arrays while
+	/// only requiring `size_of::<T>()` amount of stack memory.
+	///
+	/// # Panics
+	///
+	/// This method panics, if the size of an element (i.e. `size_of::<T>()`)
+	/// is beyond 255 bytes.
+	/// However, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
+	///
+	pub fn iter(&self) -> PmIter<T, N> {
+		PmIter::new(self)
+	}
 }
 
+
+/// An iterator over an array in progmem.
+pub struct PmIter<'a, T, const N: usize> {
+	progmem: &'a ProgMem<[T; N]>,
+	current_idx: usize,
+}
+
+impl<'a, T, const N: usize> PmIter<'a, T, N> {
+	/// Creates a new iterator over the given progmem array.
+	pub const fn new(pm: &'a ProgMem<[T; N]>) -> Self {
+		Self {
+			progmem: pm,
+			current_idx: 0,
+		}
+	}
+}
+
+impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
+	type Item = T;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		// Check for iterator end
+		if self.current_idx < N {
+			// Load next item from progmem
+			let b = self.progmem.load_at(self.current_idx);
+			self.current_idx += 1;
+
+			Some(b)
+		} else {
+			None
+		}
+	}
+}
 
 
 /// Define a static in progmem.

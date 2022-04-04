@@ -1,9 +1,12 @@
 use core::fmt;
 use core::ops::Deref;
 
+use crate::wrapper::PmIter;
+use crate::ProgMem;
 
 
 mod from_slice;
+mod validations;
 
 
 
@@ -55,6 +58,11 @@ impl<const N: usize> ByteString<N> {
 			Ok(array) => Some(Self(*array)),
 			Err(_e) => None,
 		}
+	}
+
+	/// Returns the underlying byte array.
+	pub fn as_bytes(&self) -> &[u8; N] {
+		&self.0
 	}
 }
 
@@ -122,4 +130,109 @@ macro_rules! progmem_str {
 		}
 		&*TEXT.load()
 	}};
+}
+
+
+
+/// A byte string in progmem
+///
+/// Not to be confused with a [`ByteString`].
+/// A `ByteString` is just a wrapper around a byte array (`[u8;N]`) that can
+/// be put into a [`ProgMem`].
+/// A `PmByteString` on the other hand, is a wrapper around a
+/// `ProgMem<[u8;N]>`.
+///
+#[repr(transparent)]
+pub struct PmByteString<const N: usize>(pub ProgMem<[u8; N]>);
+
+impl<const N: usize> PmByteString<N> {
+	/// Creates a new byte array from the given string
+	///
+	/// # Safety
+	///
+	/// This function is only sound to call, if the value is
+	/// stored in a static that is for instance attributed with
+	/// `#[link_section = ".progmem.data"]`.
+	pub const unsafe fn new(s: &str) -> Option<Self> {
+		Self::from_bytes(s.as_bytes())
+	}
+
+	/// Wraps the given byte slice
+	///
+	/// # Safety
+	///
+	/// This function is only sound to call, if the value is
+	/// stored in a static that is for instance attributed with
+	/// `#[link_section = ".progmem.data"]`.
+	pub const unsafe fn from_bytes(bytes: &[u8]) -> Option<Self> {
+		let res = from_slice::array_ref_try_from_slice(bytes);
+
+		match res {
+			Ok(array) => {
+				let array = *array;
+				let pm = unsafe { ProgMem::new(array) };
+				Some(Self(pm))
+			},
+			Err(_e) => None,
+		}
+	}
+
+	/// Returns the underlying progmem byte array.
+	pub fn as_bytes(&self) -> &ProgMem<[u8; N]> {
+		&self.0
+	}
+
+	/// Lazily iterate over the `char`s of the string.
+	///
+	/// This function is analog to [`ProgMem::iter`], except it is over the
+	/// `char`s of this string.
+	pub fn chars(&self) -> PmChars<N> {
+		PmChars::new(self)
+	}
+}
+
+impl<const N: usize> fmt::Display for PmByteString<N> {
+	fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+		for c in self.chars() {
+			write!(fmt, "{}", c)?
+		}
+		Ok(())
+	}
+}
+
+#[cfg(any(feature = "ufmt", doc))]
+#[doc(cfg(feature = "ufmt"))]
+impl<const N: usize> ufmt::uDisplay for PmByteString<N> {
+	fn fmt<W: ?Sized>(&self, fmt: &mut ufmt::Formatter<W>) -> Result<(), W::Error>
+	where
+		W: ufmt::uWrite,
+	{
+		for c in self.chars() {
+			ufmt::uwrite!(fmt, "{}", c)?
+		}
+		Ok(())
+	}
+}
+
+
+/// An iterator over a [`PmByteString`]
+pub struct PmChars<'a, const N: usize> {
+	bytes: PmIter<'a, u8, N>,
+}
+
+impl<'a, const N: usize> PmChars<'a, N> {
+	pub fn new(pm: &'a PmByteString<N>) -> Self {
+		PmChars {
+			bytes: pm.0.iter(),
+		}
+	}
+}
+
+impl<'a, const N: usize> Iterator for PmChars<'a, N> {
+	type Item = char;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		unsafe { validations::next_code_point(&mut self.bytes) }
+			.map(|u| core::char::from_u32(u).unwrap())
+	}
 }
