@@ -1,3 +1,36 @@
+//! String utilities
+//!
+//! This module offers further utilities base on [`ProgMem`] to make working
+//! with strings in progmem more convenient.
+//!
+//! The difficulty with strings is that normally they are either heap allocated
+//! (as with the std Rust `String`) or dynamically sized (as with `str`).
+//! To store a string in progmem, one needs first of all a fixed-sized storage
+//! variant of a `str`.
+//! One option is to use byte string literals (e.g. `b"foobar"`), however,
+//! for some reason those only accept ASCII and no Unicode.
+//! At some day, one might be able to to convert arbitrary string literals to
+//! byte arrays like this:
+//!
+//! ```ignore
+//! # use std::convert::TryInto;
+//! // Dose not compile as of 1.51, because `try_into` is not a const fn
+//! static WIKIPEDIA: [u8; 12] = "维基百科".as_bytes().try_into().unwrap();
+//! ```
+//!
+//! As a convenient workaround, this module offers:
+//! * [`LoadedString`] a simple UTF-8 encoded sized byte array
+//! * [`PmString`] a UTF-8 encoded sized byte array in progmem similar to [`ProgMem`].
+//!
+//! Also the [`progmem`](crate::progmem) macro offers a special syntax for
+//! converting a normal string literal into a [`PmString`]:
+//!
+//! ```rust
+//! // TODO: code
+//! ```
+//!
+
+
 use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Deref;
@@ -175,10 +208,19 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// A byte string in progmem
 ///
 /// Not to be confused with a [`LoadedString`].
-/// A `LoadedString` is just a wrapper around a byte array (`[u8;N]`) that can
-/// be put into a [`ProgMem`].
-/// A `PmString` on the other hand, is a wrapper around a
-/// `ProgMem<[u8;N]>`.
+/// A `LoadedString` is a simple wrapper around a byte array (`[u8;N]`) that
+/// derefs to `str`, and should be used in RAM.
+/// A `PmString` on the other hand, is a wrapper around a byte array in progmem
+/// aka around a `ProgMem<[u8;N]>`, and thus must always be progmem.
+/// Similar to `ProgMem`, `PmString` offers a [`load`](PmString::load) method to
+/// load its entire content into RAM.
+/// The loaded content will be a `LoadedString`, hence the name.
+///
+/// Besides loading the entire string at once into RAM, `PmString` also offers
+/// a lazy [`chars`](PmString::chars) iterator method, that will load just one
+/// char at a time.
+/// This allows `chars` to be used on very large strings that do not fit into
+/// the RAM as whole.
 ///
 /// # Safety
 ///
@@ -208,6 +250,8 @@ impl<const N: usize> PmString<N> {
 	/// This function is only sound to call, if the value is
 	/// stored in a static that is for instance attributed with
 	/// `#[link_section = ".progmem.data"]`.
+	///
+	/// You are encouraged to use the [`progmem`] macro instead.
 	pub const unsafe fn new(s: &str) -> Option<Self> {
 		Self::from_bytes(s.as_bytes())
 	}
@@ -267,6 +311,18 @@ impl<const N: usize> PmString<N> {
 	}
 
 	/// Loads the entire string into RAM
+	///
+	/// # Panics
+	///
+	/// This method panics, if the size of the value (i.e. `N`) is beyond 255
+	/// bytes.
+	/// However, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
+	///
+	/// If you have a very large string, consider using the lazy
+	/// [`chars`](Self::chars) iterator that accesses the string by one char at
+	/// a time and thus does not have such a limitation.
+	///
 	pub fn load(&self) -> LoadedString<N> {
 		let array = self.load_bytes();
 
@@ -279,6 +335,17 @@ impl<const N: usize> PmString<N> {
 	}
 
 	/// Loads the entire string as byte array into RAM
+	///
+	/// # Panics
+	///
+	/// This method panics, if the size of the value (i.e. `[u8; N]`) is beyond
+	/// 255 bytes.
+	/// However, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
+	///
+	/// If you have a very large string, consider using the lazy
+	/// [`chars`](Self::chars) iterator or the respective byte iterator
+	/// (via `as_bytes().iter()`).
 	pub fn load_bytes(&self) -> [u8; N] {
 		self.as_bytes().load()
 	}
@@ -290,8 +357,9 @@ impl<const N: usize> PmString<N> {
 
 	/// Lazily iterate over the `char`s of the string.
 	///
-	/// This function is analog to [`ProgMem::iter`], except it is over the
-	/// `char`s of this string.
+	/// This function is analog to [`ProgMem::iter`], except it performs UTF-8
+	/// parsing and returns the `char`s of this string, thus it is more similar
+	/// to [`str::chars`].
 	pub fn chars(&self) -> PmChars<N> {
 		PmChars::new(self)
 	}

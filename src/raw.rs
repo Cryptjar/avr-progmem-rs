@@ -1,3 +1,21 @@
+//! Raw direct progmem access
+//!
+//! This module provides functions to directly access the progmem, such as
+//! [read_value].
+//!
+//! It is recommended to use best-effort wrappers in [wrapper](crate::wrapper)
+//! and [string](crate::string), which use these functions internally.
+//! This is in particular, because having a raw `static` that is stored in the
+//! progmem is very hazardous since Rust does not understand the difference
+//! between the normal data memory domain and the program memory domain, and
+//! allows safe code to directly access those raw progmem statics, which is
+//! **undefined behavior**.
+//! The wrapper types in [wrapper](crate::wrapper) and [string](crate::string),
+//! prevent safe code from directly accessing these statics and only offer
+//! dedicated accessor methods that first load the data into the normal data
+//! memory domain via the function of this module.
+
+
 use core::mem::size_of;
 use core::mem::MaybeUninit;
 

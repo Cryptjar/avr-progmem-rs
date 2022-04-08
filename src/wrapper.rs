@@ -1,3 +1,22 @@
+//! Best-effort safe wrapper for progmem.
+//!
+//! This module offers the [`ProgMem`] struct that wraps a value in progmem,
+//! and only gives access to this value via methods that first load the value
+//! into the normal data memory domain.
+//! This is also the reason why the value must be `Copy` and is always returned
+//! by-value instead of by-reference (since the value is not in the data memory
+//! where it could be referenced).
+//!
+//! Since the `ProgMem` struct loads the value using special instructions,
+//! it must actually be in progmem, otherwise it would be
+//! **undefined behavior**, therefore, its constructor is `unsafe` where the
+//! caller must guarantee that it is indeed stored in progmem.
+//!
+//! As further convenience, the [`progmem`] macro is offered that will create
+//! a `static` in progmem and wrap the given value in the [`ProgMem`] struct
+//! for you.
+
+
 use core::convert::TryInto;
 
 use crate::raw::read_value;
@@ -142,6 +161,9 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
 	///
+	/// Notice, that here `T` is the type of the elements not the entire array
+	/// as it would be with [`load`](Self::load).
+	///
 	pub fn load_at(&self, idx: usize) -> T {
 		// Just take a reference to the selected element.
 		// Notice that this will execute a bounds check.
@@ -212,6 +234,9 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// is beyond 255 bytes.
 	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
+	///
+	/// Notice, that here `T` is the type of the elements not the entire array
+	/// as it would be with [`load`](Self::load).
 	///
 	pub fn iter(&self) -> PmIter<T, N> {
 		PmIter::new(self)

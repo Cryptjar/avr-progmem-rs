@@ -27,13 +27,13 @@
 //! ## MSRV
 //!
 //! This crate only works with a Rust `nightly-2021-01-07` compiler, which is,
-//! as of the time of writing (early 2022), still the latest version that
+//! as of the time of writing (early 2022), still the most recent version that
 //! supports AVR
 //! (see <https://github.com/rust-lang/compiler-builtins/issues/400>).
 //! So it is actually, the minimum and maximum supported version.
 //! All versions `0.2.x` will adhere to work with `nightly-2021-01-07`.
 //!
-//! Future versions such as `0.3.x` might required a new different Rust compiler
+//! Future versions such as `0.3.x` might required a newer Rust compiler
 //! version.
 //!
 //!
@@ -143,6 +143,28 @@
 //! ```
 //!
 //!
+//! # Strings
+//!
+//! Using strings such as `&str` with [`ProgMem`] is rather difficult, and
+//! surprisingly hard if Unicode support is needed
+//! (see <https://github.com/Cryptjar/avr-progmem-rs/issues/3>).
+//! Thus, to make working with string convenient the
+//! [`PmString`](string::PmString) struct is provided on top of [`ProgMem`].
+//!
+//! [`PmString`](string::PmString) stores any given `&str` as statically sized
+//! UTF-8 byte array (with full Unicode support).
+//! To make its content usable, it provides a `Display` & `uDisplay`
+//! implementation, a lazy `char` iterator, and `load` function similar to
+//! [`ProgMem`], that yields a [`LoadedString`](string::LoadedString),
+//! which in turn defers to `&str`.
+//!
+//! TODO: how about the in-line macro
+//!
+//! ## Example
+//!
+//! TODO
+//!
+//!
 //! # Other Architectures
 //!
 //! As mentioned before, this crate is specifically designed to be use with
@@ -194,6 +216,6 @@
 
 pub mod raw;
 pub mod string;
-mod wrapper;
+pub mod wrapper;
 
 pub use wrapper::ProgMem;
