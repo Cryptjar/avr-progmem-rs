@@ -12,31 +12,31 @@
 
 
 use avr_progmem::progmem; // The macro
-use avr_progmem::string::ByteString; // Helper for storing strings
+use avr_progmem::string::LoadedString; // Helper for storing strings
 #[cfg(target_arch = "avr")]
 use panic_halt as _; // halting panic implementation for AVR
 
 
 progmem! {
 	/// The static data to be stored in program code section
-	/// Notice the usage of `ByteString`, to store a string as `[u8;N]`,
+	/// Notice the usage of `LoadedString`, to store a string as `[u8;N]`,
 	/// because you can't store a `str` and storing a `&str` wouldn't have
 	/// much of an effect.
-	static progmem SOME_TEXT: ByteString<189> = ByteString::new("
+	static progmem SOME_TEXT: LoadedString<191> = LoadedString::new("
 A long test string literal, that is stored in progmem instead of DRAM.
 However, to use it, it needs to be temporarily load into DRAM,
-so an individual `ByteString` shouldn't be too long.
+so an individual `LoadedString` shouldn't be too long.
 	").unwrap();
 
 	/// More data to be stored in program code section
-	static progmem MORE_TEXT: ByteString<102> = ByteString::new("
+	static progmem MORE_TEXT: LoadedString<102> = LoadedString::new("
 However, you easily store your strings individual, limiting the amount of
 temporary DRAM necessary.
 	").unwrap();
 
 	/// Unicode works of course as expected
 	///
-	static progmem UNICODE_TEXT: ByteString<137> = ByteString::new(
+	static progmem UNICODE_TEXT: LoadedString<137> = LoadedString::new(
 		"dai 大賢者 kenja, Völlerei lässt grüßen, le garçon de théâtre, Ελληνική Δημοκρατία, Слава Україні"
 	).unwrap();
 }
@@ -86,7 +86,8 @@ fn main() -> ! {
 
 	// Even more convenient: use a one-off in-place progmem static via `progmem_str`
 	printer.println(avr_progmem::progmem_str!("Just a lone literal progmem str"));
-	printer.println(avr_progmem::progmem_str!("And another one"));
+	use avr_progmem::progmem_str as F;
+	printer.println(F!("And another one"));
 
 	// Using the ufmt impl
 	#[cfg(feature = "ufmt")]

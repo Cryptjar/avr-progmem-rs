@@ -11,15 +11,15 @@
 #![feature(const_option)]
 
 
-use avr_progmem::string::PmByteString; // A progmem wrapper for strings
+use avr_progmem::string::PmString; // A progmem wrapper for strings
 #[cfg(target_arch = "avr")]
 use panic_halt as _; // halting panic implementation for AVR
 
 
 /// A string directly in progmem
 #[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-static UNICODE_TEXT: PmByteString<137> = unsafe {
-	PmByteString::new(
+static UNICODE_TEXT: PmString<137> = unsafe {
+	PmString::new(
 		"dai 大賢者 kenja, Völlerei lässt grüßen, le garçon de théâtre, Ελληνική Δημοκρατία, \
 		 Слава Україні",
 	)
@@ -28,13 +28,13 @@ static UNICODE_TEXT: PmByteString<137> = unsafe {
 
 /// A string directly in progmem
 #[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-static LONG_TEXT: PmByteString<242> = unsafe {
-	PmByteString::new(
+static LONG_TEXT: PmString<240> = unsafe {
+	PmString::new(
 		"
 A long test string literal, that is stored in progmem instead of DRAM.
 Of course, it needs to be temporarily load into DRAM.
-However, unlike a `ByteString`, it will be only read a char at a time,
-thus a `PmByteString` can never be too long.
+However, unlike a `LoadedString`, it will be only read a char at a time,
+thus a `PmString` can never be too long.
 ",
 	)
 	.unwrap()
@@ -42,8 +42,8 @@ thus a `PmByteString` can never be too long.
 
 /// A single string that is over 2 KiB is size
 #[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-static MUCH_LONGER_TEXT: PmByteString<2177> =
-	unsafe { PmByteString::new(include_str!("./test_text.txt")).unwrap() };
+static MUCH_LONGER_TEXT: PmString<2177> =
+	unsafe { PmString::new(include_str!("./test_text.txt")).unwrap() };
 
 
 // Include a fancy printer supporting Arduino Uno's USB-Serial output as well
