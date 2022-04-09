@@ -23,22 +23,28 @@
 //! * [`PmString`] a UTF-8 encoded sized byte array in progmem similar to [`ProgMem`].
 //!
 //! Also the [`progmem`](crate::progmem) macro offers a special syntax for
-//! converting a normal string literal into a [`PmString`]:
+//! converting a normal string literal into a [`PmString`].
+//!
+//!
+//! # Examples
+//!
+//! Using [`PmString`] directly via the [`progmem`] macro:
 //!
 //! ```rust
 //! #![feature(const_option)]
 //!
 //! # use std::iter::FromIterator;
 //! use avr_progmem::progmem;
+//! use avr_progmem::string::LoadedString;
 //!
 //! progmem! {
 //!     // A simple Unicode string in progmem, internally stored as fix-sized
-//!     // byte array.
+//!     // byte array, i.e. a `PmString<18>`.
 //!     static progmem string TEXT = "Hello 大賢者";
 //! }
 //!
 //! // You can load it all at once (like a `ProgMem`)
-//! let buffer = TEXT.load();
+//! let buffer: LoadedString<15> = TEXT.load();
 //! // and use that as `&str`
 //! assert_eq!("Hello 大賢者", &*buffer);
 //!
@@ -47,6 +53,54 @@
 //! let chars_iter = TEXT.chars(); // impl Iterator<Item=char>
 //! let exp = ['H', 'e', 'l', 'l', 'o', ' ', '大', '賢', '者'];
 //! assert_eq!(&exp, &*Vec::from_iter(chars_iter));
+//!
+//! // Or you use directly the `Display`/`uDisplay` impl on `PmString`
+//! // which uses the chars-iterator internally
+//! use ufmt::uWrite;
+//! #
+//! # struct MyWriter;
+//! # impl uWrite for MyWriter {
+//! #     type Error = ();
+//! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
+//! #         Ok(()) // ignore input
+//! #     }
+//! # }
+//! let mut writer =
+//! #   MyWriter
+//!     /* SNIP */;
+//! #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//! ufmt::uwrite!(&mut writer, "{}", TEXT);
+//! ```
+//!
+//! Using the special literal in-line string macros [`progmem_str`] and
+//! [`progmem_display`]:
+//!
+//! ```rust
+//! #![feature(const_option)]
+//!
+//! use avr_progmem::progmem_str as F;
+//! use avr_progmem::progmem_display as D;
+//!
+//! // Or you use directly the `Display`/`uDisplay` impl on `PmString`
+//! // which uses the chars-iterator internally
+//! use ufmt::uWrite;
+//! # struct MyWriter;
+//! # impl uWrite for MyWriter {
+//! #     type Error = ();
+//! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
+//! #         Ok(()) // ignore input
+//! #     }
+//! # }
+//! let mut writer =
+//! #   MyWriter
+//!     /* SNIP */;
+//!
+//! // In-line string as temporary `&str`
+//! writer.write_str(F!("Hello 大賢者"));
+//!
+//! // In-line string as some `impl Display + uDisplay`
+//! #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//! ufmt::uwrite!(&mut writer, "{}", D!("Hello 大賢者"));
 //! ```
 //!
 
@@ -78,28 +132,6 @@ pub struct InvalidLengthError;
 ///
 /// This type is particularly useful to store string literals in progmem.
 ///
-/// # Example
-///
-/// ```rust
-/// #![feature(const_option)]
-///
-/// use avr_progmem::progmem;
-/// use avr_progmem::string::PmString;
-/// use avr_progmem::string::LoadedString;
-///
-/// progmem! {
-///     // Stores a string as a byte array, i.e. `[u8;19]`, but makes it usable
-///     // as `&str` (via `Deref`)
-///     static progmem string TEXT = "dai 大賢者 kenja";
-/// }
-///
-/// // The static has type `PmString`
-/// let text: &PmString<19> = &TEXT;
-/// // The loaded RAM string has type `LoadedString`
-/// let loaded: LoadedString<19> = text.load();
-/// // Which derefs to `&str`
-/// assert_eq!("dai 大賢者 kenja", &*loaded)
-/// ```
 ///
 /// # Safety
 ///
@@ -243,6 +275,7 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// This allows `chars` to be used on very large strings that do not fit into
 /// the RAM as whole.
 ///
+///
 /// # Safety
 ///
 /// This type is a wrapper around [`ProgMem`], thus it any value of this type
@@ -251,6 +284,30 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 ///
 /// Additionally to the [`ProgMem`] contract, the byte array wrapped by this
 /// struct must be valid UTF-8.
+///
+///
+/// # Example
+///
+/// ```rust
+/// #![feature(const_option)]
+///
+/// use avr_progmem::progmem;
+/// use avr_progmem::string::PmString;
+/// use avr_progmem::string::LoadedString;
+///
+/// progmem! {
+///     // Stores a string as a byte array, i.e. `[u8;19]`, but makes it usable
+///     // as `&str` (via `Deref`)
+///     static progmem string TEXT = "dai 大賢者 kenja";
+/// }
+///
+/// // The static has type `PmString`
+/// let text: &PmString<19> = &TEXT;
+/// // The loaded RAM string has type `LoadedString`
+/// let loaded: LoadedString<19> = text.load();
+/// // Which derefs to `&str`
+/// assert_eq!("dai 大賢者 kenja", &*loaded)
+/// ```
 ///
 #[repr(transparent)]
 #[non_exhaustive] // SAFETY: this struct must not be publicly constructible
@@ -450,7 +507,7 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 
 
 
-/// Define a string in progmem
+/// Define a string in progmem usable as temporary `&str`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as by [`LoadedString`] and load it here from progmem into a
@@ -460,11 +517,13 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// Similar to the C marco, this will load the full string into RAM at once
 /// and thus the string should be of limited size, to not exceed the space
 /// available in RAM.
+/// Also see the [progmem_display] macro which does not have this limitation.
 ///
-/// This macro allows to conveniently put literal string into progmem exactly,
-/// where they are used. However, since they are directly loaded into a
-/// temporary you don't get a `&'static str` back, and must use the `&str`
-/// immediately (i.e. pass it as a function parameter).
+/// This macro allows to conveniently put a literal string into progmem
+/// right where it is used.
+/// However, since they are directly loaded into a temporary you don't get a
+/// `&'static str` back, and must use the `&str` immediately (i.e. pass it as a
+/// function parameter).
 /// You can't even store the returned `&str` in a local `let` assignment.
 ///
 ///
@@ -472,24 +531,92 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 ///
 /// ```rust
 /// #![feature(const_option)]
-///
 /// use avr_progmem::progmem_str as F;
+/// use ufmt::uWrite;
 ///
-/// fn print(s: &str) {
-///     // -- snip --
-///     # assert_eq!(s, "dai 大賢者 kenja")
-/// }
+/// # struct MyWriter;
+/// # impl uWrite for MyWriter {
+/// #     type Error = ();
+/// #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
+/// #         Ok(()) // ignore input
+/// #     }
+/// # }
+/// #
+/// let mut writer = // impl uWrite
+/// #    MyWriter;
+///     /* SNIP */;
 ///
 /// // Put the literal `str` into progmem and load it here as `&str`
-/// print(F!("dai 大賢者 kenja"));
+/// writer.write_str(F!("dai 大賢者 kenja"));
 /// ```
 ///
 #[macro_export]
 macro_rules! progmem_str {
-	($text:literal) => {{
+	($text:expr) => {{
 		$crate::progmem! {
 			static progmem string TEXT = $text;
 		}
 		&*TEXT.load()
+	}};
+}
+
+
+/// Define a string in progmem usable as `impl Display + uDisplay`
+///
+/// This is a short-cut macro to create an ad-hoc static storing the given
+/// string literal as a [`PmString`] and return it.
+/// This is somewhat similar to the `F` macro available in Arduino IDE, but
+/// different.
+/// For a macro more in line with the `F` macro, see [progmem_str].
+///
+/// Unlike the `F` macro, this macro neither loads the string here, nor, can
+/// it be use as a `&str`.
+/// However, the returned value implements [Display](fmt::Display) as well as
+/// [ufmt::uDisplay] (if the `ufmt` crate feature is enabled).
+///
+/// This macro allows to conveniently put a literal string into progmem
+/// right where it is used.
+/// However, since it is not loaded (yet) into RAM it is not a `&str`, it only
+/// exposes a [Display](fmt::Display) and [ufmt::uDisplay] (if the `ufmt` crate
+/// feature is enabled) implementation,
+/// which will load it char-by-char when used, thus limiting the RAM usage,
+/// and allowing arbitrarily large strings to be wrapped.
+///
+///
+/// # Example
+///
+/// ```rust
+/// #![feature(const_option)]
+/// use avr_progmem::progmem_display as D;
+/// use ufmt::uWrite;
+///
+/// # struct MyWriter;
+/// # impl uWrite for MyWriter {
+/// #     type Error = ();
+/// #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
+/// #         Ok(()) // ignore input
+/// #     }
+/// # }
+/// #
+/// let mut writer = // impl uWrite
+/// #    MyWriter;
+///     /* SNIP */;
+///
+/// // Put the literal `str` into progmem and use it as `impl uDisplay`
+/// #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+/// ufmt::uwrite!(&mut writer, "{}", D!("dai 大賢者 kenja"));
+///
+/// // Huge strings are fine
+/// #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+/// ufmt::uwrite!(&mut writer, "{}", D!(include_str!("../examples/test_text.txt")));
+/// ```
+///
+#[macro_export]
+macro_rules! progmem_display {
+	($text:expr) => {{
+		$crate::progmem! {
+			static progmem string TEXT = $text;
+		}
+		&TEXT
 	}};
 }
