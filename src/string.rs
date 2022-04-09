@@ -14,16 +14,70 @@
 //!
 //! ```ignore
 //! # use std::convert::TryInto;
-//! // Dose not compile as of 1.51, because `try_into` is not a const fn
+//! // Dose not compile as of 1.51, because `try_into` is not a const fn, yet
 //! static WIKIPEDIA: [u8; 12] = "维基百科".as_bytes().try_into().unwrap();
 //! ```
 //!
-//! As a convenient workaround, this module offers:
+//! However, for the time being, this module offers as a convenient workaround:
 //! * [`LoadedString`] a simple UTF-8 encoded sized byte array
 //! * [`PmString`] a UTF-8 encoded sized byte array in progmem similar to [`ProgMem`].
 //!
-//! Also the [`progmem`](crate::progmem) macro offers a special syntax for
-//! converting a normal string literal into a [`PmString`].
+//!
+//! # Working with Strings
+//!
+//! To work with strings in progmem, this crate offers two APIs and two modes
+//! of operation, each with their own little tradeoff.
+//!
+//! ## Operation Modes
+//!
+//! When you want to use strings from progmem you have two options:
+//!
+//! * you can load them as whole from progmem into RAM and work with them
+//!   essentially like stack-allocated `&str`s
+//! * or, you choose to load the strings `char` after `char` from progmem and work
+//!   with them using a `char`-iterator.
+//!
+//! The first mode of operation obviously allows you to use them everywhere,
+//! where you can use a `&str`, giving you high compatibility with other APIs.
+//! On the other hand, this comes at the cost of high RAM usage.
+//! So you must leave enough free RAM to fit all your string, thus the bigger,
+//! your biggest string is, the less RAM you must use statically.
+//! So, you might have to split your strings somehow to make them manageable.
+//!
+//! The alternative is to only load just one `char` at a time.
+//! This obviously limits the amount of RAM that you need, independently of
+//! how big your strings are, allowing you to work with really huge strings.
+//! However, you no longer get a `&str`, any you have make do with a `char`
+//! iterator.
+//!
+//! However, if you only need your strings to be printed in some way,
+//! the [`Display`](fmt::Display) and [`ufmt::uDisplay`] traits implementations
+//! (the latter only if the `ufmt` crate feature is enabled) of [`PmString`],
+//! might become very handy.
+//! These trait implementations only need the `char`-iterator so they are very
+//! economic with respect to RAM usage.
+//!
+//! ## APIs
+//!
+//! API-wise you can either:
+//!
+//! * define progmem `static`s via the [`progmem`](crate::progmem) macro
+//!   and use them all over your program,
+//! * or, you create single-use progmem strings via the
+//!   [`progmem_str`](crate::progmem_str) and
+//!   [`progmem_display`](crate::progmem_display) macro
+//!
+//! The single-use macros are the most concise option, but also a rather
+//! special-case solution.
+//! `progmem_str` gives you are very temporary `&str` to an ad-hoc loaded
+//! progmem string, so you can only pass it to a function call and you need
+//! enough RAM to store it.
+//! On the other hand, [`progmem_display`](crate::progmem_display) gives you
+//! just something that is `impl Display + uDisplay`, so you can just print it,
+//! but it has minimal RAM usage.
+//!
+//! If need anything more flexible or fancy, you are probably best served
+//! creating a `static` via [`progmem`](crate::progmem) macro.
 //!
 //!
 //! # Examples

@@ -147,7 +147,7 @@
 //!
 //! Using strings such as `&str` with [`ProgMem`] is rather difficult, and
 //! surprisingly hard if Unicode support is needed
-//! (see <https://github.com/Cryptjar/avr-progmem-rs/issues/3>).
+//! (see [issue #3](https://github.com/Cryptjar/avr-progmem-rs/issues/3)).
 //! Thus, to make working with string convenient the
 //! [`PmString`](string::PmString) struct is provided on top of [`ProgMem`].
 //!
@@ -158,11 +158,83 @@
 //! [`ProgMem`], that yields a [`LoadedString`](string::LoadedString),
 //! which in turn defers to `&str`.
 //!
-//! TODO: how about the in-line macro
+//! Additionally, two special macros are provided similar to the `F` macro
+//! of the Arduino IDE, that allows to "mark" an string as to be stored in
+//! progmem while being returned at this place as a loaded `&str`.
+//!
+//! For more details see the [string](crate::string) module.
 //!
 //! ## Example
 //!
-//! TODO
+//! ```rust
+//! #![feature(const_option)]
+//!
+//! use avr_progmem::progmem;
+//!
+//! progmem! {
+//!     // A simple Unicode string in progmem.
+//!     static progmem string TEXT = "Hello 大賢者";
+//! }
+//!
+//! // You can load it and use that as `&str`
+//! let buffer = TEXT.load();
+//! assert_eq!("Hello 大賢者", &*buffer);
+//!
+//! // Or you use directly the `Display` impl
+//! assert_eq!("Hello 大賢者", format!("{}", TEXT));
+//!
+//! // Or you skip the static and use in-line progmem strings:
+//! use avr_progmem::progmem_str as F;
+//! use avr_progmem::progmem_display as D;
+//!
+//! // Either as `&str`
+//! assert_eq!("Foo 大賢者", F!("Foo 大賢者"));
+//!
+//! // Or as some `impl Display + uDisplay`
+//! assert_eq!("Bar 大賢者", format!("{}", D!("Bar 大賢者")));
+//! ```
+//!
+//! If you enabled the `ufmt` crate feature (its a default feature),
+//! you can also use `uDisplay` instead of `Display`.
+//!
+//! ```rust
+//! #![feature(const_option)]
+//! # #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//! # {
+//!
+//! use ufmt::uWrite;
+//! #
+//! # struct MyWriter;
+//! # impl uWrite for MyWriter {
+//! #     type Error = ();
+//! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
+//! #         Ok(()) // ignore input
+//! #     }
+//! # }
+//! // Assuming you have some `uWrite`
+//! let mut writer =
+//! #   MyWriter
+//!     /* SNIP */;
+//!
+//! use avr_progmem::progmem;
+//! use avr_progmem::progmem_str as F;
+//! use avr_progmem::progmem_display as D;
+//!
+//! progmem! {
+//!     // A simple Unicode string in progmem.
+//!     static progmem string TEXT = "Hello 大賢者";
+//! }
+//!
+//! // You can use the `uDisplay` impl
+//! ufmt::uwrite!(&mut writer, "{}", TEXT);
+//!
+//! // Or use the in-line `&str`
+//! writer.write_str(F!("Foo 大賢者"));
+//!
+//! // Or the in-line `impl uDisplay`
+//! ufmt::uwrite!(&mut writer, "{}", D!("Bar 大賢者"));
+//! # }
+//! ```
 //!
 //!
 //! # Other Architectures

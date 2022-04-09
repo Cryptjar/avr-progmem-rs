@@ -288,32 +288,143 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 /// definition that is defined to be stored in the progmem section and then is
 /// wrap in the `ProgMem` wrapper for safe access.
 ///
+/// There are essentially three types of statics that you can created:
 ///
-/// # Examples
+/// * ordinary fixed-size data, e.g. a `u8`, `(u16,u32)`, or your own struct.
+/// * "auto-sized" arrays, essentially any kind of array `[T; N]`
+/// * strings, i.e. anything `str`-ish such as string literals
+///
+///
+/// # Ordinary Data
+///
+/// You can store any `Copy + Sized` data in progmem and load it at your
+/// leisure.
+///
+/// ## Example
+///
+/// ```
+/// use avr_progmem::progmem;
+///
+/// #[derive(Copy, Clone)]
+/// struct Foo {
+///     a: u16,
+///     b: u32,
+/// }
+///
+/// progmem!{
+///     /// Static data stored in progmem!
+///     pub static progmem BYTE: u8 = b'a';
+///
+///     /// Anything that is `Copy + Sized`
+///     pub static progmem FOO: Foo = Foo { a: 42, b: 42 * 42 };
+/// }
+///
+/// // Loading the byte from progmem onto the stack
+/// let data: u8 = BYTE.load();
+/// assert_eq!(b'a', data);
+///
+/// // Loading the arbitrary data
+/// let foo: Foo = FOO.load();
+/// assert_eq!(42, foo.a);
+/// assert_eq!(1764, foo.b);
+/// ```
+///
+///
+/// # Arrays
+///
+/// Notice, that to access ordinary data from the progmem you have to load it
+/// as whole before you can do anything with it.
+/// In other words you can't just load `foo.a`, you have to first load the
+/// entire struct into RAM.
+///
+/// When we have arrays, stuff can get hugh quickly, therefore,
+/// specifically for arrays, we have additionally accessors to access elements
+/// individually, without the burden to load the entire array first.
 ///
 /// ```
 /// use avr_progmem::progmem;
 ///
 /// progmem!{
-///     /// Static string stored in progmem!
-///     pub static progmem WORDS: [u8; 4] = *b"abcd";
+///     /// A simple array using ordinary syntax
+///     pub static progmem ARRAY: [u16; 4] = [1, 2, 3, 4];
 /// }
 ///
-/// let data: [u8; 4] = WORDS.load();
-/// assert_eq!(b"abcd", &data);
+/// // We can still load the entire array (but you shouldn't do this with
+/// // big arrays)
+/// let array: [u16; 4] = ARRAY.load();
+/// assert_eq!([1,2,3,4], array);
+///
+/// // We can also load individual elements
+/// let last_elem: u16 = ARRAY.load_at(3);
+/// assert_eq!(4, last_elem);
+///
+/// // And even arbitrary sub-arrays (tho they need to be statically sized)
+/// let middle_stuff: [u16; 2] = ARRAY.load_sub_array(1);
+/// assert_eq!([2, 3], middle_stuff);
+///
+/// // Finally, we can iterate the array lazily loading one byte after another
+/// // so we need only just enough RAM for to handle a single element
+/// let mut elem_iter = ARRAY.iter();
+/// assert_eq!(Some(1), elem_iter.next());
+/// assert_eq!(Some(2), elem_iter.next());
+/// assert_eq!(Some(3), elem_iter.next());
+/// assert_eq!(Some(4), elem_iter.next());
+/// assert_eq!(None, elem_iter.next());
 /// ```
+///
+/// ## Auto-Sizing
+///
+/// While we could use arrays with the syntax from above, we get also use an
+/// alternative syntax, where the array size is gets inferred which is
+/// particularly useful if you include external data (e.g. form a file).
 ///
 /// ```
 /// use avr_progmem::progmem;
 ///
 /// progmem!{
-///     /// 4kB string stored in progmem!
-///     pub static progmem WORDS: [u8; 4096] = [b'X'; 4096];
+///     /// An "auto-sized" array (the size is inferred and made accessible by
+///     /// a constant named `DATA_LEN`, tho any name would do)
+///     pub static progmem<const DATA_LEN: usize> DATA: [u8; DATA_LEN] =
+///         *include_bytes!("../examples/test_text.txt"); // assume it's binary
 /// }
-/// let first_bytes: [u8; 16] = WORDS.load_sub_array(0);
-/// assert_eq!([b'X'; 16], first_bytes);
+///
+/// // "auto-sized" array can be accessed in the exactly same way as ordinary
+/// // arrays, we just don't need to hardcode the size, and even get this nice
+/// // constant at our disposal.
+/// let middle: u8 = DATA.load_at(DATA_LEN / 2);
+/// assert_eq!(32, middle);
 /// ```
 ///
+/// # Strings
+///
+/// Strings are complicated, partially, because in Rust strings such as `str`
+/// are unsized making storing them a nightmare (normally the compiler somehow
+/// manages to automagically put all your string literals into static memory,
+/// but you can't have a static storing a `str` without the `&` specifically).
+/// The next best thing is to store some fix-size array either of `char`s or
+/// of UTF-8 encoded `u8`s.
+/// However, due to this, this crate dedicated an entire
+/// [module to strings](crate::string).
+///
+/// Still, this macro has some special syntax to make string literals,
+/// which originally are `str`, into something more manageable (i.e. a
+/// [`PmString`](crate::string::PmString)) and put it into a progmem static.
+///
+/// ## Examples
+///
+/// ```rust
+/// #![feature(const_option)]
+///
+/// use avr_progmem::progmem;
+///
+/// progmem! {
+///     /// A static string stored in program memory.
+///     static progmem string TEXT = "Unicode text: 🦀";
+/// }
+///
+/// let text = TEXT.load();
+/// assert_eq!("Unicode text: 🦀", &*text);
+/// ```
 ///
 #[macro_export]
 macro_rules! progmem {
