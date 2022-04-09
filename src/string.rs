@@ -26,7 +26,27 @@
 //! converting a normal string literal into a [`PmString`]:
 //!
 //! ```rust
-//! // TODO: code
+//! #![feature(const_option)]
+//!
+//! # use std::iter::FromIterator;
+//! use avr_progmem::progmem;
+//!
+//! progmem! {
+//!     // A simple Unicode string in progmem, internally stored as fix-sized
+//!     // byte array.
+//!     static progmem string TEXT = "Hello 大賢者";
+//! }
+//!
+//! // You can load it all at once (like a `ProgMem`)
+//! let buffer = TEXT.load();
+//! // and use that as `&str`
+//! assert_eq!("Hello 大賢者", &*buffer);
+//!
+//! // Or you load it one char at a time (limits RAM usage) via the
+//! // chars-iterator
+//! let chars_iter = TEXT.chars(); // impl Iterator<Item=char>
+//! let exp = ['H', 'e', 'l', 'l', 'o', ' ', '大', '賢', '者'];
+//! assert_eq!(&exp, &*Vec::from_iter(chars_iter));
 //! ```
 //!
 
@@ -64,20 +84,21 @@ pub struct InvalidLengthError;
 /// #![feature(const_option)]
 ///
 /// use avr_progmem::progmem;
+/// use avr_progmem::string::PmString;
 /// use avr_progmem::string::LoadedString;
 ///
 /// progmem! {
 ///     // Stores a string as a byte array, i.e. `[u8;19]`, but makes it usable
 ///     // as `&str` (via `Deref`)
-///     static progmem TEXT: LoadedString<19> = LoadedString::new(
-///         "dai 大賢者 kenja"
-///     ).unwrap();
+///     static progmem string TEXT = "dai 大賢者 kenja";
 /// }
 ///
-/// // usage:
-/// let text_buffer = TEXT.load(); // The temporary DRAM buffer for `TEXT`
-/// let text: &str = &text_buffer; // Just derefs to `str`
-/// assert_eq!(text, "dai 大賢者 kenja")
+/// // The static has type `PmString`
+/// let text: &PmString<19> = &TEXT;
+/// // The loaded RAM string has type `LoadedString`
+/// let loaded: LoadedString<19> = text.load();
+/// // Which derefs to `&str`
+/// assert_eq!("dai 大賢者 kenja", &*loaded)
 /// ```
 ///
 /// # Safety
@@ -434,6 +455,11 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as by [`LoadedString`] and load it here from progmem into a
 /// temporary and return it as `&str`.
+/// This is similar to the `F` macro available in Arduino.
+///
+/// Similar to the C marco, this will load the full string into RAM at once
+/// and thus the string should be of limited size, to not exceed the space
+/// available in RAM.
 ///
 /// This macro allows to conveniently put literal string into progmem exactly,
 /// where they are used. However, since they are directly loaded into a
@@ -441,30 +467,28 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// immediately (i.e. pass it as a function parameter).
 /// You can't even store the returned `&str` in a local `let` assignment.
 ///
+///
 /// # Example
 ///
 /// ```rust
 /// #![feature(const_option)]
 ///
-/// use avr_progmem::progmem_str as S;
+/// use avr_progmem::progmem_str as F;
 ///
 /// fn print(s: &str) {
 ///     // -- snip --
 ///     # assert_eq!(s, "dai 大賢者 kenja")
 /// }
 ///
-/// // Put the literal as byte array into progmem and load it here as `&str`
-/// print(S!("dai 大賢者 kenja"));
+/// // Put the literal `str` into progmem and load it here as `&str`
+/// print(F!("dai 大賢者 kenja"));
 /// ```
+///
 #[macro_export]
 macro_rules! progmem_str {
 	($text:literal) => {{
-		const TEXT_LEN: usize = <str>::as_bytes($text).len();
 		$crate::progmem! {
-			// TODO: use PmString
-			static progmem TEXT: $crate::string::LoadedString<TEXT_LEN> = $crate::string::LoadedString::new(
-				$text
-			).unwrap();
+			static progmem string TEXT = $text;
 		}
 		&*TEXT.load()
 	}};

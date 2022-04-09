@@ -12,33 +12,33 @@
 
 
 use avr_progmem::progmem; // The macro
-use avr_progmem::string::LoadedString; // Helper for storing strings
 #[cfg(target_arch = "avr")]
 use panic_halt as _; // halting panic implementation for AVR
 
 
+//
+// Defining strings as statics in progmem
+//
+
 progmem! {
-	/// The static data to be stored in program code section
-	/// Notice the usage of `LoadedString`, to store a string as `[u8;N]`,
-	/// because you can't store a `str` and storing a `&str` wouldn't have
-	/// much of an effect.
-	static progmem SOME_TEXT: LoadedString<191> = LoadedString::new("
-A long test string literal, that is stored in progmem instead of DRAM.
-However, to use it, it needs to be temporarily load into DRAM,
-so an individual `LoadedString` shouldn't be too long.
-	").unwrap();
+	/// A static string to be stored in program code section.
+	/// Notice the usage of special `string` modifier, that accepts a `&str`
+	/// as value and will wrap it in a `PmString` instead of a
+	/// standard `ProgMem`.
+	static progmem string SOME_TEXT = concat!(
+		"A long test string literal, that is stored in progmem instead of RAM. ",
+		"If used via `load`, it is load as `LoadedString` entirely into RAM, ",
+		"so for those use-case an individual string shouldn't be too long."
+	);
 
-	/// More data to be stored in program code section
-	static progmem MORE_TEXT: LoadedString<102> = LoadedString::new("
-However, you easily store your strings individual, limiting the amount of
-temporary DRAM necessary.
-	").unwrap();
+	/// You can also load a file as string via the std `include_str` macro.
+	/// And because this is stored in progmem, it can be big,
+	/// e.g. this one is over 2 KiB is size.
+	static progmem string MUCH_LONGER_TEXT = include_str!("./test_text.txt");
 
-	/// Unicode works of course as expected
-	///
-	static progmem UNICODE_TEXT: LoadedString<137> = LoadedString::new(
-		"dai 大賢者 kenja, Völlerei lässt grüßen, le garçon de théâtre, Ελληνική Δημοκρατία, Слава Україні"
-	).unwrap();
+	/// Of course, Unicode works as expected.
+	static progmem string UNICODE_TEXT =
+		"dai 大賢者 kenja, Völlerei lässt grüßen, le garçon de théâtre, Ελληνική Δημοκρατία, Слава Україні";
 }
 
 // Include a fancy printer supporting Arduino Uno's USB-Serial output as well
@@ -72,26 +72,50 @@ fn main() -> ! {
 	printer.println("--------------------------");
 	printer.println("");
 
-	// Scope to limit the lifetime of `text_buffer`
+
+	//
+	// Using string from progmem
+	//
+
+	// Option 1)
+	// We can load the entire string at once and use references to the resulting
+	// `LoadedString` everywhere where a `&str` is expected.
+	// However, the string must of limited in size to not exceed RAM.
 	{
-		// The temporary DRAM buffer for the string
+		// Scope to limit the lifetime of `text_buffer`, since it is big.
+
+		// The temporary DRAM buffer for the string of type `LoadedString`
 		let text_buffer = SOME_TEXT.load();
-		let text: &str = &text_buffer; // Just derefs to `str`
-		printer.println(text);
+		// Just derefs to `str`
+		let _text: &str = &text_buffer;
+		// This function only accepts `&str`, deref makes this possible:
+		printer.println(&text_buffer);
 	}
 
-	// Or just using temporaries
-	printer.println(&MORE_TEXT.load());
-	printer.println(&UNICODE_TEXT.load());
 
-	// Even more convenient: use a one-off in-place progmem static via `progmem_str`
-	printer.println(avr_progmem::progmem_str!("Just a lone literal progmem str"));
+	// Option 2)
+	// We can use the `char`-iterator to access the text iteratively,
+	// this has the advantage of limiting the stack usage.
+	for c in MUCH_LONGER_TEXT.chars() {
+		// Here, `c` is just a `char`
+		let _c: char = c;
+		printer.print(c);
+	}
+	printer.println("");
+
+
+	// Option 3)
+	// We directly use the Display/uDisplay impl, which uses the char-iterator.
+	#[cfg(feature = "ufmt")] // this however requires the `ufmt` a crate feature
+	ufmt::uwriteln!(&mut printer, "{}\r", UNICODE_TEXT).unwrap();
+
+
+	// Option 4)
+	// We can use a in-place immediate string, similar to the popular C macro:
 	use avr_progmem::progmem_str as F;
-	printer.println(F!("And another one"));
+	ufmt::uwriteln!(&mut printer, "{}\r", F!("Some immediate string")).unwrap();
 
-	// Using the ufmt impl
-	#[cfg(feature = "ufmt")]
-	ufmt::uwriteln!(&mut printer, "{}\r", UNICODE_TEXT.load()).unwrap();
+
 
 	// Print some final lines
 	printer.println("");
@@ -99,14 +123,11 @@ fn main() -> ! {
 	printer.println("");
 	printer.println("DONE");
 
-	// It is very convenient to just exit on non-AVR platforms, otherwise users
-	// might get the impression that the program hangs, whereas it already
-	// succeeded.
+	// It is convenient to just exit on non-AVR platforms.
 	#[cfg(not(target_arch = "avr"))]
 	std::process::exit(0);
 
-	// Otherwise, that is on AVR, just go into an infinite loop, because on AVR
-	// we just can't exit!
+	// Otherwise, that is on AVR, just go into an infinite loop.
 	loop {
 		// Done, just do nothing
 	}

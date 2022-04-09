@@ -317,13 +317,49 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 ///
 #[macro_export]
 macro_rules! progmem {
-	// "auto size" string rule
-	// TODO: make this reasonably working
-	($(#[$attr:meta])* $vis:vis static progmem $N:ident : ByteString = $e:expr; $($t:tt)*) => {
-		// use `()` to explicitly forward the information about private items
-		$crate::progmem_internal!($(#[$attr])* $vis static $N : ByteString<$e . len()> = $e;);
+	// Special string rule
+	(
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem string $name:ident = $value:expr ;
+
+		$($rest:tt)*
+	) => {
+		// Just forward to internal rule
+		$crate::progmem_internal!{
+			$(#[$attr])*
+			$vis static progmem string $name = $value ;
+		}
+
 		// Recursive call to allow multiple items in macro invocation
-		$crate::progmem!($($t)*);
+		$crate::progmem!{
+			$($rest)*
+		}
+	};
+
+	// Catch strings rule, better use the above special rule
+	(
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem $name:ident : LoadedString < $ty:literal > = LoadedString :: new ( $value:expr ) $( . unwrap () $(@ $unwrapped:ident)? )? ;
+
+		$($rest:tt)*
+	) => {
+		// Use an anonymous constant to scope the types used for the warning.
+		const _ : () = {
+			#[deprecated = concat!("Prefer using the special `PmString` rule. Try: ", stringify!($vis), " static progmem string ", stringify!($name), " = ", stringify!($value), ";")]
+			struct $name;
+
+			let _ = $name;
+		};
+
+		// Crate the progmem static via internal macro
+		$crate::progmem_internal!{
+			$(#[$attr])* $vis static progmem $name : LoadedString < $ty > = LoadedString :: new ( $value ) $( . unwrap() $($unwrapped)?)?;
+		}
+
+		// Recursive call to allow multiple items in macro invocation
+		$crate::progmem!{
+			$($rest)*
+		}
 	};
 
 	// Catch references rule, reference are evil!
@@ -334,9 +370,6 @@ macro_rules! progmem {
 
 		$($rest:tt)*
 	) => {
-		// TODO: Consider whether to deny this entirely
-		//compile_error!("You really should not");
-
 		// Use an anonymous constant to scope the types used for the warning.
 		const _ : () = {
 			#[deprecated = "You should not use a reference type for progmem, because this way only the reference itself will be in progmem, whereas the underlying data will not be in progmem!"]
@@ -359,13 +392,13 @@ macro_rules! progmem {
 	// Standard rule
 	(
 		$( #[ $attr:meta ] )*
-		$vis:vis static progmem $name:ident : $ty:ty = $value:expr ;
+		$vis:vis static progmem $( < const $size_name:ident : usize > )? $name:ident : $ty:ty = $value:expr ;
 
 		$($rest:tt)*
 	) => {
 		// Crate the progmem static via internal macro
 		$crate::progmem_internal!{
-			$(#[$attr])* $vis static progmem $name : $ty = $value;
+			$(#[$attr])* $vis static progmem $( < const $size_name : usize > )? $name : $ty = $value;
 		}
 
 		// Recursive call to allow multiple items in macro invocation
@@ -384,19 +417,68 @@ macro_rules! progmem {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! progmem_internal {
+	// The string rule creating the progmem string static via `PmString`
+	{
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem string $name:ident = $value:expr ;
+	} => {
+
+		// PmString must be stored in the progmem or text section!
+		// The link_section lets us define it:
+		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
+
+		// User attributes
+		$(#[$attr])*
+		// The actual static definition
+		$vis static $name : $crate::string::PmString<{
+			// This bit runs at compile-time
+			let s: &str = $value;
+			s.len()
+		}> =
+			unsafe {
+				// SAFETY: This call is sound, be cause we ensure with the above
+				// link_section attribute that this value is indeed in the
+				// progmem section.
+				$crate::string::PmString::new( $value )
+			}.unwrap();
+	};
+
+	// The rule creating an auto-sized progmem static via `ProgMem`
+	{
+		$( #[ $attr:meta ] )*
+		$vis:vis static progmem < const $size_name:ident : usize > $name:ident : $ty:ty = $value:expr ;
+	} => {
+		// Create a constant with the size of the value, which is retrieved
+		// via `SizedOwned` on the value, assuming it is an array of sorts.
+		//#[doc = concat!("Size of [", stringify!( $name ))]
+		$vis const $size_name : usize = {
+			// This bit is a bit hacky, we just hope that the type of `$value`
+			// has some `len` method.
+			$value.len()
+		};
+
+		// Just a normal prgomem static, `$ty` may use the above constant
+		$crate::progmem_internal!{
+			$( #[ $attr ] )*
+			$vis static progmem $name : $ty = $value ;
+		}
+	};
+
+	// The normal rule creating a progmem static via `ProgMem`
 	{
 		$( #[ $attr:meta ] )*
 		$vis:vis static progmem $name:ident : $ty:ty = $value:expr ;
 	} => {
 		// ProgMem must be stored in the progmem or text section!
-		// The link_section lets us define it.
+		// The link_section lets us define it:
 		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
+
 		// User attributes
 		$(#[$attr])*
 		// The actual static definition
 		$vis static $name : $crate::ProgMem<$ty> =
 			unsafe {
-				// This call is safe, be cause we ensure with the above
+				// SAFETY: This call is safe, be cause we ensure with the above
 				// link_section attribute that this value is indeed in the
 				// progmem section.
 				$crate::ProgMem::new( $value )

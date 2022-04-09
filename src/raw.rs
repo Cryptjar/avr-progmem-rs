@@ -271,6 +271,9 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 			// We just use normal data or text segment, and thus that it is
 			// actually save to just access the data.
 
+			// Ignore the unused vars:
+			let _ = size_bytes;
+
 			// Now, just copy the bytes from p_addr to out
 			// It is save by the way, because we require the user to give use
 			// pointer valid for exactly that case.

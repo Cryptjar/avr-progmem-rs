@@ -7,14 +7,20 @@
 //! Quite useful for examples.
 //!
 
+// This a shared model, so there are function only used in specific cases
+#![allow(dead_code)]
 
 // Import the Arduino libraries, interestingly they don't cause problems perse
 // on other architectures. Through, we will not use there.
-use arduino_hal::port::mode::AnyInput;
-use arduino_hal::port::mode::Input;
-use arduino_hal::port::mode::Output;
-use arduino_hal::port::Pin;
-use arduino_hal::prelude::*;
+cfg_if::cfg_if! {
+	if #[cfg(target_arch = "avr")] {
+		use arduino_hal::port::mode::AnyInput;
+		use arduino_hal::port::mode::Input;
+		use arduino_hal::port::mode::Output;
+		use arduino_hal::port::Pin;
+		use arduino_hal::prelude::*;
+	}
+}
 
 
 #[cfg(target_arch = "avr")]
