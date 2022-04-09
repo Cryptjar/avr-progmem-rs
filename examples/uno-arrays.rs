@@ -1,5 +1,5 @@
 //
-// This file provides a example on how to use auto-sizing statics on an
+// This file provides a example on how to use array statics on an
 // Arduino Uno.
 //
 
@@ -30,6 +30,8 @@ progmem! {
 
 	// The size in the array type is automatically derived from the value.
 	// As note: don't confuse this with text, see `uno-string.rs` for those!
+	// Notice this is just about 2 kiB, and the Arduino Uno only has 2 kiB of
+	// SRAM, so if where not stored in progmem, would not work at all.
 	static progmem<const LONG_LEN: usize> LONG: [u8; LONG_LEN] =
 		*include_bytes!("./test_text.txt");
 }

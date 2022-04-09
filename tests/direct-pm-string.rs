@@ -1,20 +1,16 @@
 //
-// This file provides a example on how to use strings on an Arduino Uno.
+// This file tests using `PmString` directly, this is not recommended,
+// use the `progmem` macro instead.
 //
 
-
-// Define no_std only for AVR
-#![cfg_attr(target_arch = "avr", no_std)]
-#![no_main]
-//
-// To unwrap the Option in const context
+// Our generated warnings need a nightly feature
+#![feature(extended_key_value_attributes)]
+// Using unwrap in const context
 #![feature(const_option)]
 
-
-use avr_progmem::string::PmString; // A progmem wrapper for strings
-#[cfg(target_arch = "avr")]
-use panic_halt as _; // halting panic implementation for AVR
-
+use avr_progmem::progmem;
+use avr_progmem::string::LoadedString;
+use avr_progmem::string::PmString;
 
 /// A string directly in progmem
 #[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
@@ -43,45 +39,16 @@ thus a `PmString` can never be too long.
 /// A single string that is over 2 KiB is size
 #[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
 static MUCH_LONGER_TEXT: PmString<2177> =
-	unsafe { PmString::new(include_str!("./test_text.txt")).unwrap() };
+	unsafe { PmString::new(include_str!("../examples/test_text.txt")).unwrap() };
 
-
-// Include a fancy printer supporting Arduino Uno's USB-Serial output as well
-// as stdout on non-AVR targets.
-mod printer;
-use printer::Printer;
-
-#[no_mangle]
-fn main() -> ! {
-	let mut printer = {
-		#[cfg(target_arch = "avr")]
-		{
-			// Initialize the USB-Serial output on the Arduino Uno
-
-			let dp = arduino_hal::Peripherals::take().unwrap();
-			let pins = arduino_hal::pins!(dp);
-			let serial = arduino_hal::default_serial!(dp, pins, 9600);
-
-			Printer(serial)
-		}
-		#[cfg(not(target_arch = "avr"))]
-		{
-			// Just use stdout for non-AVR targets
-			Printer
-		}
-	};
-
-	// Print some introduction text
-	printer.println("Hello from Arduino!");
-	printer.println("");
-	printer.println("--------------------------");
-	printer.println("");
-
+#[test]
+fn read_by_chars() {
 	// Read string from progmem char-by-char
-	for c in LONG_TEXT.chars() {
-		printer.print(c);
+	for _c in LONG_TEXT.chars() {
+		//printer.print(c);
 	}
 
+	/*
 	printer.println("");
 
 	// Or just use the `ufmt::uDisplay` impl
@@ -111,4 +78,21 @@ fn main() -> ! {
 	loop {
 		// Done, just do nothing
 	}
+	*/
+}
+
+
+#[test]
+fn test_direct_loaded_string() {
+	progmem! {
+		// Stores a string as a byte array, i.e. `[u8;19]`, but makes it usable
+		// as `&str` (via `Deref`)
+		static progmem TEXT: LoadedString<19> = LoadedString::new(
+			"dai 大賢者 kenja"
+		).unwrap();
+	}
+	// usage:
+	let text_buffer = TEXT.load(); // The temporary DRAM buffer for `TEXT`
+	let text: &str = &text_buffer; // Just derefs to `str`
+	assert_eq!(text, "dai 大賢者 kenja");
 }

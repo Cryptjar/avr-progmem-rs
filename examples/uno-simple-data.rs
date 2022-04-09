@@ -39,16 +39,25 @@
 use avr_progmem::progmem;
 #[cfg(target_arch = "avr")]
 use panic_halt as _; // halting panic implementation for AVR
+use ufmt::derive::uDebug;
 
 
-// The length of the below data block.
-const TEXT_LEN: usize = 2177;
+// We can store any `Copy + Sized` data in progmem
+#[derive(Debug, uDebug, Copy, Clone)]
+struct MyStuff {
+	int: u32,
+	opt: Option<bool>,
+}
+
+
 progmem! {
 	/// The static data to be stored in program code section
-	/// Notice this is just about 2 kiB, and the Arduino Uno only has 2 kiB of
-	/// SRAM, so if where not stored in progmem, would not work at all.
-	static progmem TEXT: [u8;TEXT_LEN] = *include_bytes!("./test_text.txt");
+	static progmem DATA: (u8, u16, u32) = (1, 2, 3);
+
+	/// Custom data in progmem
+	static progmem STUFF: MyStuff = MyStuff {int: 42, opt: Some(true)};
 }
+
 
 // Include a fancy printer supporting Arduino Uno's USB-Serial output as well
 // as stdout on non-AVR targets.
@@ -81,17 +90,14 @@ fn main() -> ! {
 	printer.println("--------------------------");
 	printer.println("");
 
-	// Loop through the entire `TEXT` and print it char-by-char
-	let mut idx = 0;
-	loop {
-		printer.print(TEXT.load_at(idx) as char);
 
-		idx += 1;
+	// We can load the data via `load`
+	let data: (u8, u16, u32) = DATA.load();
+	ufmt::uwriteln!(&mut printer, "Data: {:?}\r", data).unwrap();
 
-		if idx >= TEXT_LEN {
-			break;
-		}
-	}
+	// We can also load it where we need it
+	ufmt::uwriteln!(&mut printer, "Stuff: {:?}\r", STUFF.load()).unwrap();
+
 
 	// Print some final lines
 	printer.println("");
