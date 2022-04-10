@@ -67,3 +67,9 @@ features = ["arduino-uno"]
 git = "https://github.com/Rahix/avr-hal.git"
 rev = "e897783816437a677aa577ddfdaa34e9a1e86d96"
 
+
+[patch.crates-io]
+# Fixes formatting of u32, however, it causes a link error due to u32-div
+# Which in turn is fixed (in config.toml) by:
+#     build-std-features = ["compiler-builtins-mangled-names"]
+ufmt = { git = "https://github.com/mrk-its/ufmt.git", rev = "e6e574625e89bce9a5cb907eae43bfd45672f768" }
