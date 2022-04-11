@@ -95,6 +95,8 @@
 //!     // A simple Unicode string in progmem, internally stored as fix-sized
 //!     // byte array, i.e. a `PmString<18>`.
 //!     static progmem string TEXT = "Hello 大賢者";
+//!     // text too large to fit in the RAM of a microcontroller
+//!     static progmem string LOVECRAFT = include_str!("../examples/test_text.txt");
 //! }
 //!
 //! // You can load it all at once (like a `ProgMem`)
@@ -235,7 +237,7 @@ impl<const N: usize> LoadedString<N> {
 		match res {
 			Ok(array) => {
 				let array = *array;
-				unsafe {
+				{
 					// SAFETY: the caller ensures that the bytes are valid
 					// UTF-8
 					Some(Self::from_array(array))
@@ -403,7 +405,7 @@ impl<const N: usize> PmString<N> {
 		match res {
 			Ok(array) => {
 				let array = *array;
-				unsafe {
+				{
 					// SAFETY: the caller ensures that this value is in progmem
 					// and the bytes are valid UTF-8
 					Some(Self::from_array(array))
@@ -431,7 +433,7 @@ impl<const N: usize> PmString<N> {
 		};
 		*/
 
-		let pm = unsafe {
+		let pm = {
 			// SAFETY: the caller ensures that this value is in progmem
 			ProgMem::new(array)
 		};

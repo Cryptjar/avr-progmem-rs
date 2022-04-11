@@ -45,14 +45,14 @@ pub(super) unsafe fn next_code_point<I: Iterator<Item = u8>>(bytes: &mut I) -> O
 	let init = utf8_first_byte(x, 2);
 	// SAFETY: `bytes` produces an UTF-8-like string,
 	// so the iterator must produce a value here.
-	let y = unsafe { bytes.next().unwrap() };
+	let y = { bytes.next().unwrap() };
 	let mut ch = utf8_acc_cont_byte(init, y);
 	if x >= 0xE0 {
 		// [[x y z] w] case
 		// 5th bit in 0xE0 .. 0xEF is always clear, so `init` is still valid
 		// SAFETY: `bytes` produces an UTF-8-like string,
 		// so the iterator must produce a value here.
-		let z = unsafe { bytes.next().unwrap() };
+		let z = { bytes.next().unwrap() };
 		let y_z = utf8_acc_cont_byte((y & CONT_MASK) as u32, z);
 		ch = init << 12 | y_z;
 		if x >= 0xF0 {
@@ -60,7 +60,7 @@ pub(super) unsafe fn next_code_point<I: Iterator<Item = u8>>(bytes: &mut I) -> O
 			// use only the lower 3 bits of `init`
 			// SAFETY: `bytes` produces an UTF-8-like string,
 			// so the iterator must produce a value here.
-			let w = unsafe { bytes.next().unwrap() };
+			let w = { bytes.next().unwrap() };
 			ch = (init & 7) << 18 | utf8_acc_cont_byte(y_z, w);
 		}
 	}
