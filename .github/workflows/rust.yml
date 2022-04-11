@@ -5,7 +5,8 @@ on:
     branches:
       - '**'        # matches every branch
   pull_request:
-    branches: [ master ]
+    branches:
+      - '**'        # matches every target branch
 
 env:
   CARGO_TERM_COLOR: always
