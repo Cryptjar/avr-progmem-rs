@@ -379,18 +379,27 @@ pub struct PmString<const N: usize> {
 impl<const N: usize> PmString<N> {
 	/// Creates a new byte array from the given string
 	///
+	/// You are encouraged to use the [`progmem`] macro instead.
+	///
 	/// # Safety
 	///
 	/// This function is only sound to call, if the value is
 	/// stored in a static that is for instance attributed with
 	/// `#[link_section = ".progmem.data"]`.
-	///
-	/// You are encouraged to use the [`progmem`] macro instead.
 	pub const unsafe fn new(s: &str) -> Option<Self> {
-		Self::from_bytes(s.as_bytes())
+		unsafe {
+			// SAFETY: The caller must ensure that this object will be stored
+			// in program memory domain.
+			//
+			// Additionally, `s` must by UTF-8 encoded, because it is a `str`.
+			Self::from_bytes(s.as_bytes())
+		}
 	}
 
 	/// Wraps the given byte slice
+	///
+	/// You are encouraged to use the [`progmem`] macro instead.
+	/// Otherwise, consider using the less `unsafe` [new](Self::new) function.
 	///
 	/// # Safety
 	///
@@ -416,6 +425,8 @@ impl<const N: usize> PmString<N> {
 	}
 
 	/// Wraps the given byte array
+	///
+	/// You are encouraged to use the [`progmem`] macro instead.
 	///
 	/// # Safety
 	///

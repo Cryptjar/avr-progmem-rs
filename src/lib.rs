@@ -11,6 +11,11 @@
 //
 // Allows to document required crate features on items
 #![feature(doc_cfg)]
+//
+// Allow `unsafe` in `unsafe fn`s, and make `unsafe` blocks everywhere a
+// necessity.
+#![feature(unsafe_block_in_unsafe_fn)]
+#![forbid(unsafe_op_in_unsafe_fn)]
 
 //!
 //! Progmem utilities for the AVR architectures.
