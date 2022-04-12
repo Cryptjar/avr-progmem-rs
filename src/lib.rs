@@ -175,8 +175,6 @@
 //! ## Example
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! use avr_progmem::progmem;
 //!
 //! progmem! {
@@ -206,7 +204,6 @@
 //! you can also use `uDisplay` instead of `Display`.
 //!
 //! ```rust
-//! #![feature(const_option)]
 //! # #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
 //! # {
 //!

@@ -160,8 +160,6 @@ For more details see the [string](https://docs.rs/avr-progmem/latest/avr-progmem
 ## Example
 
 ```rust
-#![feature(const_option)]
-
 use avr_progmem::progmem;
 
 progmem! {
@@ -191,7 +189,6 @@ If you enabled the `ufmt` crate feature (its a default feature),
 you can also use `uDisplay` instead of `Display`.
 
 ```rust
-#![feature(const_option)]
 
 use ufmt::uWrite;
 // Assuming you have some `uWrite`

@@ -85,8 +85,6 @@
 //! Using [`PmString`] directly via the [`progmem`] macro:
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! # use std::iter::FromIterator;
 //! use avr_progmem::progmem;
 //! use avr_progmem::string::LoadedString;
@@ -132,8 +130,6 @@
 //! [`progmem_display`]:
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! use avr_progmem::progmem_str as F;
 //! use avr_progmem::progmem_display as D;
 //!
@@ -345,8 +341,6 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
-///
 /// use avr_progmem::progmem;
 /// use avr_progmem::string::PmString;
 /// use avr_progmem::string::LoadedString;
@@ -536,7 +530,6 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
 /// use avr_progmem::progmem_str as F;
 /// use ufmt::uWrite;
 ///
@@ -592,7 +585,6 @@ macro_rules! progmem_str {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
 /// use avr_progmem::progmem_display as D;
 /// use ufmt::uWrite;
 ///

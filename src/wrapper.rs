@@ -441,8 +441,6 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 /// ## Examples
 ///
 /// ```rust
-/// #![feature(const_option)]
-///
 /// use avr_progmem::progmem;
 ///
 /// progmem! {
