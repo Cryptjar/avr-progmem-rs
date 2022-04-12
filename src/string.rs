@@ -237,7 +237,7 @@ impl<const N: usize> LoadedString<N> {
 		match res {
 			Ok(array) => {
 				let array = *array;
-				{
+				unsafe {
 					// SAFETY: the caller ensures that the bytes are valid
 					// UTF-8
 					Some(Self::from_array(array))
@@ -405,7 +405,7 @@ impl<const N: usize> PmString<N> {
 		match res {
 			Ok(array) => {
 				let array = *array;
-				{
+				unsafe {
 					// SAFETY: the caller ensures that this value is in progmem
 					// and the bytes are valid UTF-8
 					Some(Self::from_array(array))
@@ -433,7 +433,7 @@ impl<const N: usize> PmString<N> {
 		};
 		*/
 
-		let pm = {
+		let pm = unsafe {
 			// SAFETY: the caller ensures that this value is in progmem
 			ProgMem::new(array)
 		};
