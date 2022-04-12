@@ -16,6 +16,9 @@
 // necessity.
 #![feature(unsafe_block_in_unsafe_fn)]
 #![forbid(unsafe_op_in_unsafe_fn)]
+//
+// Allow panics in const fn
+#![feature(const_panic)]
 
 //!
 //! Progmem utilities for the AVR architectures.

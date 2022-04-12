@@ -14,13 +14,13 @@
 /// Used in [`array_ref_try_from_slice`].
 // We need a local copy of this type, because we need to instantiate it, but it
 // has a private field.
-pub(super) struct TryFromSliceError(());
+pub(crate) struct TryFromSliceError(());
 
 /// Const version of `<&[T; N]>::try_from(&[T])`
 ///
 /// Original Source:
 /// https://github.com/rust-lang/rust/blob/eb82facb1626166188d49599a3313fc95201f556/library/core/src/array/mod.rs#L203-L215
-pub(super) const fn array_ref_try_from_slice<'a, T, const N: usize>(
+pub(crate) const fn array_ref_try_from_slice<'a, T, const N: usize>(
 	slice: &[T],
 ) -> Result<&[T; N], TryFromSliceError> {
 	if slice.len() == N {

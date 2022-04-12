@@ -17,7 +17,6 @@
 //! for you.
 
 
-use core::convert::TryInto;
 
 use crate::raw::read_value;
 
@@ -62,8 +61,22 @@ use crate::raw::read_value;
 /// Therefore, only a immutable `static` in the correct memory segment can be
 /// considered to be a correct location for it.
 ///
-#[repr(transparent)]
-pub struct ProgMem<T>(T);
+#[non_exhaustive] // SAFETY: Must not be creatable
+pub struct ProgMem<T> {
+	target: *const T,
+}
+
+unsafe impl<T> Send for ProgMem<T> {
+	// SAFETY: pointers per-se are sound to send & share.
+	// Further more, we will never mutate the underling value and it is sound
+	// to have shared read-only access to any data.
+}
+
+unsafe impl<T> Sync for ProgMem<T> {
+	// SAFETY: pointers per-se are sound to send & share.
+	// Further more, we will never mutate the underling value and it is sound
+	// to have shared read-only access to any data.
+}
 
 impl<T> ProgMem<T> {
 	/// Construct a new instance of this type.
@@ -97,8 +110,10 @@ impl<T> ProgMem<T> {
 	/// because this is an AVR-only crate, not a general Harvard architecture
 	/// crate!
 	///
-	pub const unsafe fn new(t: T) -> Self {
-		ProgMem(t)
+	pub const unsafe fn new(target: *const T) -> Self {
+		ProgMem {
+			target,
+		}
 	}
 }
 
@@ -122,13 +137,10 @@ impl<T: Copy> ProgMem<T> {
 	/// [`load_sub_array`]: struct.ProgMem.html#method.load_sub_array
 	///
 	pub fn load(&self) -> T {
-		// Get the actual address of the value to load
-		let p_addr = &self.0;
-
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
 		// in the progmem domain, which is what `read_value` requires from us.
-		unsafe { read_value(p_addr) }
+		unsafe { read_value(self.target) }
 	}
 
 	/// Return the raw pointer to the inner value.
@@ -137,8 +149,8 @@ impl<T: Copy> ProgMem<T> {
 	/// domain! It may never be dereferenced via the default Rust operations.
 	/// That means a `unsafe{*pm.get_inner_ptr()}` is **undefined behavior**!
 	///
-	pub fn ptr(&self) -> *const T {
-		&self.0
+	pub fn as_ptr(&self) -> *const T {
+		self.target
 	}
 }
 
@@ -165,9 +177,13 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// as it would be with [`load`](Self::load).
 	///
 	pub fn load_at(&self, idx: usize) -> T {
-		// Just take a reference to the selected element.
-		// Notice that this will execute a bounds check.
-		let addr: &T = &self.0[idx];
+		// SAFETY: check that `idx` is in bounds
+		assert!(idx < N, "Given index is out of bounds");
+
+		let first_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let element_ptr = first_element_ptr.wrapping_add(idx);
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -175,7 +191,7 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		//
 		// Also notice that the slice-indexing above gives us a bounds check.
 		//
-		unsafe { read_value(addr) }
+		unsafe { read_value(element_ptr) }
 	}
 
 	/// Loads a sub array from the inner array.
@@ -203,14 +219,26 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// be lifted in the future.
 	///
 	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T; M] {
-		assert!(M <= N);
+		// Just a check to give a nicer panic message
+		assert!(
+			M <= N,
+			"The sub array can not be grater than the source array"
+		);
 
-		// Make sure that we convert from &[T] to &[T;M] without constructing
-		// an actual [T;M], because we MAY NOT LOAD THE DATA YET!
-		// Also notice, that this sub-slicing dose ensure that the bound are
-		// correct.
-		let slice: &[T] = &self.0[start_idx..(start_idx + M)];
-		let array: &[T; M] = slice.try_into().unwrap();
+		// SAFETY: bounds check, the last element of the sub array must
+		// still be within the source array (i.e. self)
+		assert!(
+			start_idx + M <= N,
+			"The sub array goes beyond the end of the source array"
+		);
+
+		let first_source_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let first_output_element_ptr = first_source_element_ptr.wrapping_add(start_idx);
+
+		// Pointer into as sub array into the source
+		let sub_array_ptr: *const [T; M] = first_output_element_ptr.cast();
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -218,7 +246,7 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		//
 		// Also notice that the sub-slicing above gives us a bounds check.
 		//
-		unsafe { read_value(array) }
+		unsafe { read_value(sub_array_ptr) }
 	}
 
 	/// Lazily iterate over all elements
@@ -525,6 +553,15 @@ macro_rules! progmem {
 }
 
 
+#[doc(hidden)]
+pub const fn array_from_str<const N: usize>(s: &str) -> [u8; N] {
+	let array_ref = crate::string::from_slice::array_ref_try_from_slice(s.as_bytes());
+	match array_ref {
+		Ok(r) => *r,
+		Err(_) => panic!("Invalid array size"),
+	}
+}
+
 
 /// Only for internal use. Use the `progmem!` macro instead.
 #[doc(hidden)]
@@ -535,25 +572,46 @@ macro_rules! progmem_internal {
 		$( #[ $attr:meta ] )*
 		$vis:vis static progmem string $name:ident = $value:expr ;
 	} => {
-
-		// PmString must be stored in the progmem or text section!
-		// The link_section lets us define it:
-		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-
 		// User attributes
 		$(#[$attr])*
-		// The actual static definition
-		$vis static $name : $crate::string::PmString<{
+		// The facade static definition, this only contains a pointer and thus
+		// is NOT in progmem, which in turn makes it safe & sound to access this
+		// facade.
+		$vis static $name: $crate::string::PmString<{
 			// This bit runs at compile-time
 			let s: &str = $value;
 			s.len()
-		}> =
+		}> = {
+			// This inner hidden static contains the actual real raw value.
+			//
+			// SAFETY: it must be stored in the progmem or text section!
+			// The `link_section` lets us define that:
+			#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
+			static VALUE: [u8; {
+				// This bit runs at compile-time
+				let s: &str = $value;
+				s.len()
+			}] = $crate::wrapper::array_from_str( $value );
+
+			let pm = unsafe {
+				// SAFETY: This call is sound because we ensure with the above
+				// `link_section` attribute on `VALUE` that it is indeed
+				// in the progmem section.
+				$crate::wrapper::ProgMem::new(
+					// TODO: use the `addr_of` macro here!!!
+					& VALUE
+				)
+			};
+
+			// Just return the PmString wrapper around the local static
 			unsafe {
-				// SAFETY: This call is sound, be cause we ensure with the above
-				// link_section attribute that this value is indeed in the
-				// progmem section.
-				$crate::string::PmString::new( $value )
-			}.unwrap();
+				// SAFETY: This call is sound, because we started out with a
+				// `&str` thus the conent of `VALUE` must be valid UTF-8
+				$crate::string::PmString::new(
+					pm
+				)
+			}
+		};
 	};
 
 	// The rule creating an auto-sized progmem static via `ProgMem`
@@ -582,19 +640,28 @@ macro_rules! progmem_internal {
 		$( #[ $attr:meta ] )*
 		$vis:vis static progmem $name:ident : $ty:ty = $value:expr ;
 	} => {
-		// ProgMem must be stored in the progmem or text section!
-		// The link_section lets us define it:
-		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-
 		// User attributes
 		$(#[$attr])*
-		// The actual static definition
-		$vis static $name : $crate::ProgMem<$ty> =
+		// The facade static definition, this only contains a pointer and thus
+		// is NOT in progmem, which in turn makes it safe & sound to access this
+		// facade.
+		$vis static $name: $crate::wrapper::ProgMem<$ty> = {
+			// This inner hidden static contains the actual real raw value.
+			//
+			// SAFETY: it must be stored in the progmem or text section!
+			// The `link_section` lets us define that:
+			#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
+			static VALUE: $ty = $value;
+
 			unsafe {
-				// SAFETY: This call is safe, be cause we ensure with the above
-				// link_section attribute that this value is indeed in the
-				// progmem section.
-				$crate::ProgMem::new( $value )
-			};
+				// SAFETY: This call is sound because we ensure with the above
+				// `link_section` attribute on `VALUE` that it is indeed
+				// in the progmem section.
+				$crate::wrapper::ProgMem::new(
+					// TODO: use the `addr_of` macro here!!!
+					& VALUE
+				)
+			}
+		};
 	};
 }
