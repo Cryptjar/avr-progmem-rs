@@ -457,6 +457,7 @@ macro_rules! progmem {
 		// Use an anonymous constant to scope the types used for the warning.
 		const _ : () = {
 			#[deprecated = concat!("Prefer using the special `PmString` rule. Try: ", stringify!($vis), " static progmem string ", stringify!($name), " = ", stringify!($value), ";")]
+			#[allow(non_camel_case_types)]
 			struct $name;
 
 			let _ = $name;
@@ -484,6 +485,7 @@ macro_rules! progmem {
 		// Use an anonymous constant to scope the types used for the warning.
 		const _ : () = {
 			#[deprecated = "You should not use a reference type for progmem, because this way only the reference itself will be in progmem, whereas the underlying data will not be in progmem!"]
+			#[allow(non_camel_case_types)]
 			struct $name;
 
 			let _ = $name;
