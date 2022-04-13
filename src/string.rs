@@ -85,8 +85,6 @@
 //! Using [`PmString`] directly via the [`progmem`] macro:
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! # use std::iter::FromIterator;
 //! use avr_progmem::progmem;
 //! use avr_progmem::string::LoadedString;
@@ -132,8 +130,6 @@
 //! [`progmem_display`]:
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! use avr_progmem::progmem_str as F;
 //! use avr_progmem::progmem_display as D;
 //!
@@ -166,10 +162,10 @@ use core::fmt;
 use core::ops::Deref;
 
 use crate::wrapper::PmIter;
-use crate::ProgMem;
+use crate::wrapper::ProgMem;
 
 
-mod from_slice;
+pub(crate) mod from_slice;
 mod validations;
 
 
@@ -345,8 +341,6 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
-///
 /// use avr_progmem::progmem;
 /// use avr_progmem::string::PmString;
 /// use avr_progmem::string::LoadedString;
@@ -365,7 +359,6 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// assert_eq!("dai 大賢者 kenja", &*loaded)
 /// ```
 ///
-#[repr(transparent)]
 #[non_exhaustive] // SAFETY: this struct must not be publicly constructible
 pub struct PmString<const N: usize> {
 	/// The inner UTF-8 string as byte array in progmem.
@@ -386,69 +379,9 @@ impl<const N: usize> PmString<N> {
 	/// This function is only sound to call, if the value is
 	/// stored in a static that is for instance attributed with
 	/// `#[link_section = ".progmem.data"]`.
-	pub const unsafe fn new(s: &str) -> Option<Self> {
-		unsafe {
-			// SAFETY: The caller must ensure that this object will be stored
-			// in program memory domain.
-			//
-			// Additionally, `s` must by UTF-8 encoded, because it is a `str`.
-			Self::from_bytes(s.as_bytes())
-		}
-	}
-
-	/// Wraps the given byte slice
-	///
-	/// You are encouraged to use the [`progmem`] macro instead.
-	/// Otherwise, consider using the less `unsafe` [new](Self::new) function.
-	///
-	/// # Safety
-	///
-	/// This function is only sound to call, if the value is
-	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem.data"]`.
-	///
-	/// Additionally, the given byte slice must contain valid UTF-8.
-	pub const unsafe fn from_bytes(bytes: &[u8]) -> Option<Self> {
-		let res = from_slice::array_ref_try_from_slice(bytes);
-
-		match res {
-			Ok(array) => {
-				let array = *array;
-				unsafe {
-					// SAFETY: the caller ensures that this value is in progmem
-					// and the bytes are valid UTF-8
-					Some(Self::from_array(array))
-				}
-			},
-			Err(_e) => None,
-		}
-	}
-
-	/// Wraps the given byte array
-	///
-	/// You are encouraged to use the [`progmem`] macro instead.
-	///
-	/// # Safety
-	///
-	/// This function is only sound to call, if the value is
-	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem.data"]`.
 	///
 	/// The give byte array must contain valid UTF-8.
-	///
-	pub const unsafe fn from_array(array: [u8; N]) -> Self {
-		/* TODO: Use this once it becomes const fn
-		match core::str::from_utf8(&array) {
-			Ok(_) => (),
-			Err(_) => panic!("Not UTF-8"),
-		};
-		*/
-
-		let pm = unsafe {
-			// SAFETY: the caller ensures that this value is in progmem
-			ProgMem::new(array)
-		};
-
+	pub const unsafe fn new(pm: ProgMem<[u8; N]>) -> Self {
 		// SAFETY: the caller ensures that the bytes are valid UTF-8
 		Self {
 			pm_utf8_array: pm,
@@ -574,7 +507,7 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 
 
 
-/// Define a string in progmem usable as temporary `&str`
+/// Define a single-use string in progmem usable as temporary `&str`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as by [`LoadedString`] and load it here from progmem into a
@@ -597,7 +530,6 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
 /// use avr_progmem::progmem_str as F;
 /// use ufmt::uWrite;
 ///
@@ -628,7 +560,7 @@ macro_rules! progmem_str {
 }
 
 
-/// Define a string in progmem usable as `impl Display + uDisplay`
+/// Define a single-use string in progmem usable as `impl Display + uDisplay`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as a [`PmString`] and return it.
@@ -653,7 +585,6 @@ macro_rules! progmem_str {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
 /// use avr_progmem::progmem_display as D;
 /// use ufmt::uWrite;
 ///
