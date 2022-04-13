@@ -458,11 +458,11 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 ///
 /// progmem! {
 ///     /// A static string stored in program memory.
-///     static progmem string TEXT = "Unicode text: 🦀";
+///     static progmem string TEXT = "Unicode text: 大賢者";
 /// }
 ///
 /// let text = TEXT.load();
-/// assert_eq!("Unicode text: 🦀", &*text);
+/// assert_eq!("Unicode text: 大賢者", &*text);
 /// ```
 ///
 #[macro_export]

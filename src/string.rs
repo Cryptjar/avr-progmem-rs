@@ -93,8 +93,6 @@
 //!     // A simple Unicode string in progmem, internally stored as fix-sized
 //!     // byte array, i.e. a `PmString<18>`.
 //!     static progmem string TEXT = "Hello 大賢者";
-//!     // text too large to fit in the RAM of a microcontroller
-//!     static progmem string LOVECRAFT = include_str!("../examples/test_text.txt");
 //! }
 //!
 //! // You can load it all at once (like a `ProgMem`)
@@ -102,57 +100,76 @@
 //! // and use that as `&str`
 //! assert_eq!("Hello 大賢者", &*buffer);
 //!
-//! // Or you load it one char at a time (limits RAM usage) via the
-//! // chars-iterator
+//! // Or you load it one char at a time (limits RAM usage)
 //! let chars_iter = TEXT.chars(); // impl Iterator<Item=char>
 //! let exp = ['H', 'e', 'l', 'l', 'o', ' ', '大', '賢', '者'];
 //! assert_eq!(&exp, &*Vec::from_iter(chars_iter));
 //!
-//! // Or you use directly the `Display`/`uDisplay` impl on `PmString`
-//! // which uses the chars-iterator internally
-//! use ufmt::uWrite;
+//! // Or you use the `Display`/`uDisplay` impl on `PmString`
+//! fn foo<W: ufmt::uWrite>(writer: &mut W) {
+//!     #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//!     ufmt::uwrite!(writer, "{}", TEXT);
+//! }
 //! #
-//! # struct MyWriter;
-//! # impl uWrite for MyWriter {
+//! # struct MyWriter(String);
+//! # impl ufmt::uWrite for MyWriter {
 //! #     type Error = ();
-//! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
-//! #         Ok(()) // ignore input
+//! #     fn write_str(&mut self, s: &str) -> Result<(),()> {
+//! #         self.0.push_str(s);
+//! #         Ok(())
 //! #     }
 //! # }
-//! let mut writer =
-//! #   MyWriter
-//!     /* SNIP */;
-//! #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
-//! ufmt::uwrite!(&mut writer, "{}", TEXT);
+//! # let mut writer = MyWriter(String::new());
+//! # foo(&mut writer);
+//! # #[cfg(feature = "ufmt")] // will be still empty otherwise
+//! # assert_eq!("Hello 大賢者", writer.0);
 //! ```
 //!
-//! Using the special literal in-line string macros [`progmem_str`] and
-//! [`progmem_display`]:
+//! Using the special literal in-line string macros [`progmem_str`]
+//! (yielding a `&str`) and [`progmem_display`] (yielding some
+//! `impl Display + uDisplay`):
 //!
 //! ```rust
 //! use avr_progmem::progmem_str as F;
 //! use avr_progmem::progmem_display as D;
 //!
-//! // Or you use directly the `Display`/`uDisplay` impl on `PmString`
-//! // which uses the chars-iterator internally
-//! use ufmt::uWrite;
+//! fn foo<W: ufmt::uWrite>(writer: &mut W) {
+//!     // In-line string as temporary `&str`
+//!     writer.write_str(F!("Hello 大賢者"));
+//!
+//!     // In-line string as some `impl Display + uDisplay`
+//!     #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//!     ufmt::uwrite!(writer, "{}", D!("Hello 大賢者"));
+//! }
+//! #
+//! # use ufmt::uWrite;
 //! # struct MyWriter;
-//! # impl uWrite for MyWriter {
+//! # impl ufmt::uWrite for MyWriter {
 //! #     type Error = ();
 //! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
 //! #         Ok(()) // ignore input
 //! #     }
 //! # }
-//! let mut writer =
-//! #   MyWriter
-//!     /* SNIP */;
+//! # let mut writer = MyWriter;
+//! # foo(&mut writer);
+//! ```
 //!
-//! // In-line string as temporary `&str`
-//! writer.write_str(F!("Hello 大賢者"));
+//! You can also use arbitrary `&str`-yielding expression, including loading
+//! huge strings from files, just don't use `PmString::load` nor `progmem_str`
+//! with huge strings (because if it is bigger than 255 bytes, it will panic).
 //!
-//! // In-line string as some `impl Display + uDisplay`
-//! #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
-//! ufmt::uwrite!(&mut writer, "{}", D!("Hello 大賢者"));
+//! ```rust
+//! use avr_progmem::progmem;
+//! use avr_progmem::progmem_display as D;
+//!
+//! progmem! {
+//!     // Text too large to fit in the RAM of a Arduino Uno
+//!     static progmem string HUGE_TEXT = include_str!("../examples/test_text.txt");
+//! }
+//! println!("{}", HUGE_TEXT);
+//!
+//! // In-line a huge string from a file
+//! println!("{}", D!(include_str!("../examples/test_text.txt")));
 //! ```
 //!
 
