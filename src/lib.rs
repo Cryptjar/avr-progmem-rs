@@ -328,5 +328,3 @@
 pub mod raw;
 pub mod string;
 pub mod wrapper;
-
-pub use wrapper::ProgMem;
