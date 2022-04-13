@@ -162,7 +162,7 @@ use core::fmt;
 use core::ops::Deref;
 
 use crate::wrapper::PmIter;
-use crate::ProgMem;
+use crate::wrapper::ProgMem;
 
 
 pub(crate) mod from_slice;
@@ -507,7 +507,7 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 
 
 
-/// Define a string in progmem usable as temporary `&str`
+/// Define a single-use string in progmem usable as temporary `&str`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as by [`LoadedString`] and load it here from progmem into a
@@ -560,7 +560,7 @@ macro_rules! progmem_str {
 }
 
 
-/// Define a string in progmem usable as `impl Display + uDisplay`
+/// Define a single-use string in progmem usable as `impl Display + uDisplay`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as a [`PmString`] and return it.
