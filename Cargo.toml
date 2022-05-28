@@ -1,6 +1,6 @@
 [package]
 name = "avr-progmem"
-version = "0.2.0"
+version = "0.3.0-alpha"
 authors = ["Cryptjar <cryptjar@junk.studio>"]
 license = "Apache-2.0"
 edition = "2018"
