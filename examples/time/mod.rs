@@ -324,6 +324,7 @@ impl<ClockFreq: Clock> TimerClock<ClockFreq> {
 }
 
 // The timer interrupt service routine
+#[cfg(target_arch = "avr")]
 #[avr_device::interrupt(atmega328p)]
 fn TIMER0_COMPA() {
 	// We just increment the "millis" interrupt counter, because an interrupt

@@ -16,9 +16,9 @@
 //! memory domain via the function of this module.
 
 
+use core::arch::asm;
 use core::mem::size_of;
 use core::mem::MaybeUninit;
-use core::arch::asm;
 
 use cfg_if::cfg_if;
 
