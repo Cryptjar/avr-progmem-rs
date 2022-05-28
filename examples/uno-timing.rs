@@ -3,9 +3,7 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 #![feature(const_option)]
-#![feature(extended_key_value_attributes)]
 #![feature(test)]
-#![feature(int_bits_const)]
 #![feature(bench_black_box)]
 
 
