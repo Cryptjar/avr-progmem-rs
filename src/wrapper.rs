@@ -609,8 +609,7 @@ macro_rules! progmem_internal {
 				// `link_section` attribute on `VALUE` that it is indeed
 				// in the progmem section.
 				$crate::wrapper::ProgMem::new(
-					// TODO: use the `addr_of` macro here!!!
-					& VALUE
+					::core::ptr::addr_of!(VALUE)
 				)
 			};
 
@@ -669,8 +668,7 @@ macro_rules! progmem_internal {
 				// `link_section` attribute on `VALUE` that it is indeed
 				// in the progmem section.
 				$crate::wrapper::ProgMem::new(
-					// TODO: use the `addr_of` macro here!!!
-					& VALUE
+					::core::ptr::addr_of!(VALUE)
 				)
 			}
 		};
