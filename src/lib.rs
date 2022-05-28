@@ -2,9 +2,8 @@
 #![no_std]
 //
 // We need inline assembly for the `lpm` instruction.
-// However, it seems in more recent Rust version there is no more `llvm_asm`.
-// And docs.rs uses the latest Rust version.
-#![cfg_attr(not(doc), feature(llvm_asm))]
+// As of now (mid 2022), inline assembly for AVR is still unstable.
+#![feature(asm_experimental_arch)]
 //
 // For string support, we need to convert from slice to array in const context.
 #![cfg_attr(not(doc), feature(const_raw_ptr_deref))]
