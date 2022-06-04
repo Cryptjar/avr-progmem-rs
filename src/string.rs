@@ -315,8 +315,7 @@ impl<const N: usize> fmt::Display for LoadedString<N> {
 	}
 }
 
-#[cfg(any(feature = "ufmt", doc))]
-#[doc(cfg(feature = "ufmt"))]
+#[cfg(feature = "ufmt")]
 impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 	fn fmt<W: ?Sized>(&self, fmt: &mut ufmt::Formatter<W>) -> Result<(), W::Error>
 	where
@@ -469,8 +468,7 @@ impl<const N: usize> fmt::Display for PmString<N> {
 	}
 }
 
-#[cfg(any(feature = "ufmt", doc))]
-#[doc(cfg(feature = "ufmt"))]
+#[cfg(feature = "ufmt")]
 impl<const N: usize> ufmt::uDisplay for PmString<N> {
 	fn fmt<W: ?Sized>(&self, fmt: &mut ufmt::Formatter<W>) -> Result<(), W::Error>
 	where

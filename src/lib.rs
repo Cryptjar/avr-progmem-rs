@@ -6,7 +6,7 @@
 #![feature(asm_experimental_arch)]
 //
 // Allows to document required crate features on items
-#![feature(doc_cfg)]
+#![cfg_attr(doc, feature(doc_auto_cfg))]
 //
 // Allow `unsafe` in `unsafe fn`s, and make `unsafe` blocks everywhere a
 // necessity.
