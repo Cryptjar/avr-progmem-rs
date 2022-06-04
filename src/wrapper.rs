@@ -57,9 +57,10 @@ use crate::raw::read_value;
 /// be changed).
 /// Also the `target` pointer must be valid for the `'static` lifetime.
 ///
-/// However, the above requirement only applies to the AVR architecture
-/// (`#[cfg(target_arch = "avr")]`), because otherwise normal data access
-/// primitives are used. This means that the value must be stored in the
+/// However, the above requirement about the program memory domain only applies
+/// to the AVR architecture (`#[cfg(target_arch = "avr")]`),
+/// otherwise normal data access primitives are used.
+/// This means that the value must be stored in the
 /// regular data memory domain for ALL OTHER architectures! This still
 /// holds, even if such other architecture is of the Harvard architecture,
 /// because this is an AVR-only crate, not a general Harvard architecture
@@ -113,13 +114,11 @@ impl<T> ProgMem<T> {
 	/// which `target` points is stored in a `static` that is stored in progmem,
 	/// e.g. by using the attribute `#[link_section = ".progmem.data"]`.
 	///
-	/// However, the above requirement only applies to the AVR architecture
-	/// (`#[cfg(target_arch = "avr")]`), because otherwise normal data access
-	/// primitives are used. This means that the value must be stored in the
-	/// regular data memory domain for ALL OTHER architectures! This still
-	/// holds, even if such other architecture is of the Harvard architecture,
-	/// because this is an AVR-only crate, not a general Harvard architecture
-	/// crate!
+	/// However, the above requirement about the program memory domain only
+	/// applies to the AVR architecture (`#[cfg(target_arch = "avr")]`),
+	/// otherwise normal data access primitives are used,
+	/// and thus the `target` pointer needs to point to normal data on those
+	/// architectures.
 	///
 	pub const unsafe fn new(target: *const T) -> Self {
 		ProgMem {
@@ -253,12 +252,9 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		// Pointer into as sub array into the source
 		let sub_array_ptr: *const [T; M] = first_output_element_ptr.cast();
 
-		// This is safe, because the invariant of this struct demands that
-		// this value (i.e. self and thus also its inner value) are stored
+		// SAFETY: This is safe, because the invariant of this struct demands
+		// that this value (i.e. self and thus also its inner value) are stored
 		// in the progmem domain, which is what `read_value` requires from us.
-		//
-		// Also notice that the sub-slicing above gives us a bounds check.
-		//
 		unsafe { read_value(sub_array_ptr) }
 	}
 
@@ -441,15 +437,19 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 /// Strings are complicated, partially, because in Rust strings such as `str`
 /// are unsized making storing them a nightmare (normally the compiler somehow
 /// manages to automagically put all your string literals into static memory,
-/// but you can't have a static storing a `str` without the `&` specifically).
-/// The next best thing is to store some fix-size array either of `char`s or
-/// of UTF-8 encoded `u8`s.
-/// However, due to this, this crate dedicated an entire
+/// but you can't have a `static` that stores a `str` by-value, that is without
+/// the `&`).
+/// The next best thing that one can do to store a "string" is to store some
+/// fix-size array either of `char`s or of UTF-8 encoded `u8`s, which aren't
+/// exactly `str` and thus much more cumbersome to use.
+/// Therefore, this crate has dedicated an entire
 /// [module to strings](crate::string).
 ///
-/// Still, this macro has some special syntax to make string literals,
-/// which originally are `str`, into something more manageable (i.e. a
-/// [`PmString`](crate::string::PmString)) and put it into a progmem static.
+/// Consequently, this macro also has some special syntax to make string
+/// literals, which are given as some `&str` and are automagically converted
+/// into something more manageable
+/// (i.e. a [`PmString`](crate::string::PmString)) and are put in this format
+/// into a progmem `static`.
 ///
 /// ## Examples
 ///
@@ -457,7 +457,8 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 /// use avr_progmem::progmem;
 ///
 /// progmem! {
-///     /// A static string stored in program memory.
+///     /// A static string stored in program memory as a `PmString`.
+///     /// Notice the `string` keyword.
 ///     static progmem string TEXT = "Unicode text: 大賢者";
 /// }
 ///
