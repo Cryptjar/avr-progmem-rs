@@ -487,26 +487,19 @@ macro_rules! progmem {
 		}
 	};
 
-	// Catch strings rule, better use the above special rule
+	// Catch "hand" strings rule, use the above special rule instead
 	(
 		$( #[ $attr:meta ] )*
-		$vis:vis static progmem $name:ident : LoadedString < $ty:literal > = LoadedString :: new ( $value:expr ) $( . unwrap () $(@ $unwrapped:ident)? )? ;
+		$vis:vis static progmem $name:ident : $( avr_progmem::string:: )? LoadedString < $ty:literal > = $( avr_progmem::string:: )?  LoadedString :: new ( $value:expr ) $( . unwrap () $(@ $unwrapped:ident)? )? ;
 
 		$($rest:tt)*
 	) => {
-		// Use an anonymous constant to scope the types used for the warning.
-		const _ : () = {
-			#[deprecated = concat!("Prefer using the special `PmString` rule. Try: ", stringify!($vis), " static progmem string ", stringify!($name), " = ", stringify!($value), ";")]
-			#[allow(non_camel_case_types)]
-			struct $name;
+		// Make this a hard compile-time error.
+		::core::compile_error!("Prefer using the special `PmString` rule with the `string` keyword.");
+		::core::compile_error!(concat!("Use instead: ", stringify!($vis), " static progmem string ", stringify!($name), " = ..."));
 
-			let _ = $name;
-		};
-
-		// Crate the progmem static via internal macro
-		$crate::progmem_internal!{
-			$(#[$attr])* $vis static progmem $name : LoadedString < $ty > = LoadedString :: new ( $value ) $( . unwrap() $($unwrapped)?)?;
-		}
+		// Emit a dummy to suppress errors where `$name` is used
+		static $name : $crate::wrapper::ProgMem< $crate::string::LoadedString< $ty > > = todo!();
 
 		// Recursive call to allow multiple items in macro invocation
 		$crate::progmem!{
@@ -522,19 +515,11 @@ macro_rules! progmem {
 
 		$($rest:tt)*
 	) => {
-		// Use an anonymous constant to scope the types used for the warning.
-		const _ : () = {
-			#[deprecated = "You should not use a reference type for progmem, because this way only the reference itself will be in progmem, whereas the underlying data will not be in progmem!"]
-			#[allow(non_camel_case_types)]
-			struct $name;
+		// Make this a hard compile-time error
+		::core::compile_error!("Do not use a reference type for progmem, because this way only the reference itself would be in progmem, whereas the underlying data would still be in the normal data domain!");
 
-			let _ = $name;
-		};
-
-		// Crate the progmem static via internal macro
-		$crate::progmem_internal!{
-			$(#[$attr])* $vis static progmem $name : & $ty = $value;
-		}
+		// Emit a dummy to suppress errors where `$name` is used
+		static $name : & $ty = todo!();
 
 		// Recursive call to allow multiple items in macro invocation
 		$crate::progmem!{
@@ -675,3 +660,25 @@ macro_rules! progmem_internal {
 		};
 	};
 }
+
+
+/// ```compile_fail
+/// use avr_progmem::progmem;
+/// progmem! {
+/// 	static progmem AREF: &str = "Sometext";
+/// }
+/// ```
+#[cfg(doctest)]
+pub struct ProgMemReferenceTest;
+
+
+/// ```compile_fail
+/// use avr_progmem::progmem;
+/// progmem! {
+/// 	// Should notify that we should use the `progmem string` rule instead
+/// 	static progmem HAND_STRING: LoadedString<34> =
+/// 		LoadedString::new("hand crafted progmem loaded string").unwrap();
+/// }
+/// ```
+#[cfg(doctest)]
+pub struct HandStringTest;

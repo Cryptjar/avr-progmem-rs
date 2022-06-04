@@ -37,9 +37,11 @@ However, unlike a `ByteString`, it will be only read a char at a time,
 thus a `ProgMemByteString` can never be too long.";
 }
 
+use avr_progmem::string;
+
 // A LoadedString in progmem
 progmem! {
-	static progmem LONG_STRING: LoadedString<245> = LoadedString::new("A long test string literal, that is stored in progmem instead of DRAM.
+	static progmem LONG_STRING: string::LoadedString<245> = avr_progmem::string::LoadedString::new("A long test string literal, that is stored in progmem instead of DRAM.
 Of course, it needs to be temporarily load into DRAM.
 However, unlike a `ByteString`, it will be only read a char at a time,
 thus a `ProgMemByteString` can never be too long.").unwrap();
