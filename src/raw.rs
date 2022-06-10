@@ -16,6 +16,7 @@
 //! memory domain via the function of this module.
 
 
+use core::arch::asm;
 use core::mem::size_of;
 use core::mem::MaybeUninit;
 
@@ -81,17 +82,19 @@ pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 			let res: u8;
 
 			// The inline assembly to read a single byte from given address
-			llvm_asm!(
-				// Just issue the single `lpm` assembly instruction, which reads
-				// implicitly indirectly the address from the Z register, and
-				// stores implicitly the read value in the register 0.
-				"lpm"
-				// Output is in the register 0
-				: "={r0}"(res)
-				// Input the program memory address to read from
-				: "z"(p_addr)
-				// No clobber list.
-			);
+			unsafe {
+				asm!(
+					// Just issue the single `lpm` assembly instruction, which reads
+					// implicitly indirectly the address from the Z register, and
+					// stores implicitly the read value in the register 0.
+					"lpm {}, Z",
+					// Output is in a register
+					out(reg) res,
+					// Input the program memory address to read from
+					in("Z") p_addr,
+					// No clobber list.
+				);
+			}
 
 			// Just output the read value
 			res
@@ -253,37 +256,39 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 			// This loop appears in the assembly, because it allows to exploit
 			// `lpm 0, Z+` instruction that simultaneously increments the
 			// pointer, and allows to write a very compact loop.
-			llvm_asm!(
-				"
-					// load value from program memory at indirect Z into temp
-					// register $3 and post-increment Z by one
-					lpm $3, Z+
+			unsafe {
+				asm!(
+					"
+						// load value from program memory at indirect Z into temp
+						// register $3 and post-increment Z by one
+						lpm {1}, Z+
 
-					// write register $3 to data memory at indirect X
-					// and post-increment X by one
-					st X+, $3
+						// write register $3 to data memory at indirect X
+						// and post-increment X by one
+						st X+, {1}
 
-					// Decrement the loop counter in register $0 (size_bytes).
-					// If zero has been reached the equality flag is set.
-					subi $0, 1
+						// Decrement the loop counter in register $0 (size_bytes).
+						// If zero has been reached the equality flag is set.
+						subi {0}, 1
 
-					// Check whether the end has not been reached and if so jump back.
-					// The end is reached if $0 (size_bytes) == 0, i.e. equality flag
-					// is set.
-					// Thus if equality flag is NOT set (brNE) jump back by 4
-					// instruction, that are all instructions in this assembly.
-					// Notice: 4 instructions = 8 Byte
-					brne -8
-				"
-				// Define all registers as outputs, so we may modify them
-				: "=r"(_a), "=z"(_b), "=x"(_c), "=r"(_d)
-				// Input the iteration count, input program memory address,
-				// and output data memory address (tied to the respective
-				// "output" registers
-				: "0"(size_bytes), "1"(p_addr), "2"(out)
-				// Mark condition-codes and memory as clobbered
-				: "cc", "memory"
-			);
+						// Check whether the end has not been reached and if so jump back.
+						// The end is reached if $0 (size_bytes) == 0, i.e. equality flag
+						// is set.
+						// Thus if equality flag is NOT set (brNE) jump back by 4
+						// instruction, that are all instructions in this assembly.
+						// Notice: 4 instructions = 8 Byte
+						brne -8
+					",
+					// Some register for counting the number of bytes, gets modified
+					inout(reg) size_bytes => _,
+					// Some scratch register, just clobber
+					out(reg) _,
+					// Input address in Z, gets modified
+					inout("Z") p_addr => _,
+					// Output address in X, gets modified
+					inout("X") out => _,
+				);
+			}
 
 		} else if #[cfg(not(target_arch = "avr"))] {
 			// This is the non-AVR dummy.

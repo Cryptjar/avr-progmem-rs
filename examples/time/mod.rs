@@ -4,6 +4,8 @@
 // Original source:
 // https://github.com/Rahix/avr-hal/blob/e897783816437a677aa577ddfdaa34e9a1e86d96/examples/arduino-uno/src/bin/uno-millis.rs#L15-L71
 
+#![allow(dead_code)] // Just use as a kind of library for examples
+
 use core::cell::Cell;
 use core::marker::PhantomData;
 
@@ -324,6 +326,7 @@ impl<ClockFreq: Clock> TimerClock<ClockFreq> {
 }
 
 // The timer interrupt service routine
+#[cfg(target_arch = "avr")]
 #[avr_device::interrupt(atmega328p)]
 fn TIMER0_COMPA() {
 	// We just increment the "millis" interrupt counter, because an interrupt

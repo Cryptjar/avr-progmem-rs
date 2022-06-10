@@ -1,6 +1,6 @@
 [package]
 name = "avr-progmem"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Cryptjar <cryptjar@junk.studio>"]
 license = "Apache-2.0"
 edition = "2018"
@@ -60,13 +60,13 @@ features = ["atmega328p", "rt"]
 [dev-dependencies.arduino-hal]
 # It is not yet available via crates.io
 git = "https://github.com/Rahix/avr-hal.git"
-rev = "e897783816437a677aa577ddfdaa34e9a1e86d96"
+rev = "81edfcd908be8d3b2cd763cf2dc76aedbb22286b"
 features = ["arduino-uno"]
 
 [dev-dependencies.atmega-hal]
 # It is not yet available via crates.io
 git = "https://github.com/Rahix/avr-hal.git"
-rev = "e897783816437a677aa577ddfdaa34e9a1e86d96"
+rev = "81edfcd908be8d3b2cd763cf2dc76aedbb22286b"
 
 
 [patch.crates-io]

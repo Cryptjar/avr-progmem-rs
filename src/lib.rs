@@ -2,23 +2,15 @@
 #![no_std]
 //
 // We need inline assembly for the `lpm` instruction.
-// However, it seems in more recent Rust version there is no more `llvm_asm`.
-// And docs.rs uses the latest Rust version.
-#![cfg_attr(not(doc), feature(llvm_asm))]
-//
-// For string support, we need to convert from slice to array in const context.
-#![cfg_attr(not(doc), feature(const_raw_ptr_deref))]
+// As of now (mid 2022), inline assembly for AVR is still unstable.
+#![feature(asm_experimental_arch)]
 //
 // Allows to document required crate features on items
-#![feature(doc_cfg)]
+#![cfg_attr(doc, feature(doc_auto_cfg))]
 //
 // Allow `unsafe` in `unsafe fn`s, and make `unsafe` blocks everywhere a
 // necessity.
-#![feature(unsafe_block_in_unsafe_fn)]
 #![forbid(unsafe_op_in_unsafe_fn)]
-//
-// Allow panics in const fn
-#![feature(const_panic)]
 
 //!
 //! Progmem utilities for the AVR architectures.
@@ -33,18 +25,17 @@
 //! This crate is implemented only in Rust and some short assembly, it does NOT
 //! depend on the [`avr-libc`] or any other C-library. However, due to the use
 //! of inline assembly, this crate may only be compiled using a **nightly Rust**
-//! compiler.
+//! compiler (as of mid 2022, inline assembly for AVR is still 'experimental').
 //!
 //! ## MSRV
 //!
-//! This crate only works with a Rust `nightly-2021-01-07` compiler, which is,
-//! as of the time of writing (early 2022), still the most recent version that
-//! supports AVR
-//! (see <https://github.com/rust-lang/compiler-builtins/issues/400>).
-//! So it is actually, the minimum and maximum supported version.
-//! All versions `0.2.x` will adhere to work with `nightly-2021-01-07`.
+//! This crate works with a Rust `nightly-2022-05-10` compiler.
+//! All versions `0.3.x` will adhere to work with `nightly-2022-05-10`.
+//! Other Rust compiler version (particularly newer ones) might also work,
+//! but due to the use of experimental compiler features it is possible that
+//! some future Rust compiler version will fail to work.
 //!
-//! Future versions such as `0.3.x` might required a newer Rust compiler
+//! Future versions such as `0.4.x` might required a newer Rust compiler
 //! version.
 //!
 //!
@@ -84,20 +75,24 @@
 //! functions which simply load a given pointer from the program memory are
 //! inherently `unsafe`.
 //!
-//! Notice that using a `&u8` reference might make things rather worse than
-//! safe.
-//! Because a reference can be easily dereferenced by safe code, which would be
-//! **undefined behavior** if that reference points into the program memory.
+//! Notice that using references (e.g. `&u8`) to the program code domain should
+//! generally be avoided because references in Rust should be dereferencable,
+//! which the program code domain is not.
+//!
+//! Additionally references can be easily dereferenced by safe code,
+//! which would be **undefined behavior** if that reference points into the
+//! program memory.
 //! Therefore, a Rust reference to a `static` that is stored in program memory
-//! must be considered hazardous, and it is recommended to only use raw pointers
-//! to those `static`s (if you happened to have a new Rust compiler version you
-//! can directly create raw pointers without references by using the
-//! [`addr_of!`](core::ptr::addr_of) macro).
+//! must be considered hazardous (if not **UB**),
+//! and it is recommended to only use raw pointers to those `static`s,
+//! e.g. obtained via the [`addr_of!`](core::ptr::addr_of) macro,
+//! which directly creates raw pointers without needing a reference.
 //!
 //! ## Example
 //!
 //! ```
 //! use avr_progmem::raw::read_byte;
+//! use core::ptr::addr_of;
 //!
 //! // This `static` must never be directly dereferenced/accessed!
 //! // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
@@ -108,7 +103,7 @@
 //! // Load the byte from progmem
 //! // Here, it is sound, because due to the link_section it is indeed in the
 //! // program code memory.
-//! let data: u8 = unsafe { read_byte(&P_BYTE) };
+//! let data: u8 = unsafe { read_byte(addr_of!(P_BYTE)) };
 //! assert_eq!(b'A', data);
 //! ```
 //!
@@ -129,8 +124,7 @@
 //! special requirements, it should be considered hazardous to have a reference
 //! to data stored in program memory.
 //! Instead, only raw pointers to this kind of data should be kept,
-//! created e.g. via the [`addr_of!`](core::ptr::addr_of) macro
-//! (tho, it just did not exist back in `nightly-2021-01-07`).
+//! created e.g. via the [`addr_of!`](core::ptr::addr_of) macro.
 //! Consequently, the `ProgMem` just wrap a pointer to data in progmem,
 //! which in turn must be stored in a `static` marked with
 //! `#[link_section = ".progmem.data"]`.
