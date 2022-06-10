@@ -85,8 +85,6 @@
 //! Using [`PmString`] directly via the [`progmem`] macro:
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! # use std::iter::FromIterator;
 //! use avr_progmem::progmem;
 //! use avr_progmem::string::LoadedString;
@@ -95,8 +93,6 @@
 //!     // A simple Unicode string in progmem, internally stored as fix-sized
 //!     // byte array, i.e. a `PmString<18>`.
 //!     static progmem string TEXT = "Hello 大賢者";
-//!     // text too large to fit in the RAM of a microcontroller
-//!     static progmem string LOVECRAFT = include_str!("../examples/test_text.txt");
 //! }
 //!
 //! // You can load it all at once (like a `ProgMem`)
@@ -104,59 +100,76 @@
 //! // and use that as `&str`
 //! assert_eq!("Hello 大賢者", &*buffer);
 //!
-//! // Or you load it one char at a time (limits RAM usage) via the
-//! // chars-iterator
+//! // Or you load it one char at a time (limits RAM usage)
 //! let chars_iter = TEXT.chars(); // impl Iterator<Item=char>
 //! let exp = ['H', 'e', 'l', 'l', 'o', ' ', '大', '賢', '者'];
 //! assert_eq!(&exp, &*Vec::from_iter(chars_iter));
 //!
-//! // Or you use directly the `Display`/`uDisplay` impl on `PmString`
-//! // which uses the chars-iterator internally
-//! use ufmt::uWrite;
+//! // Or you use the `Display`/`uDisplay` impl on `PmString`
+//! fn foo<W: ufmt::uWrite>(writer: &mut W) {
+//!     #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//!     ufmt::uwrite!(writer, "{}", TEXT);
+//! }
 //! #
-//! # struct MyWriter;
-//! # impl uWrite for MyWriter {
+//! # struct MyWriter(String);
+//! # impl ufmt::uWrite for MyWriter {
 //! #     type Error = ();
-//! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
-//! #         Ok(()) // ignore input
+//! #     fn write_str(&mut self, s: &str) -> Result<(),()> {
+//! #         self.0.push_str(s);
+//! #         Ok(())
 //! #     }
 //! # }
-//! let mut writer =
-//! #   MyWriter
-//!     /* SNIP */;
-//! #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
-//! ufmt::uwrite!(&mut writer, "{}", TEXT);
+//! # let mut writer = MyWriter(String::new());
+//! # foo(&mut writer);
+//! # #[cfg(feature = "ufmt")] // will be still empty otherwise
+//! # assert_eq!("Hello 大賢者", writer.0);
 //! ```
 //!
-//! Using the special literal in-line string macros [`progmem_str`] and
-//! [`progmem_display`]:
+//! Using the special literal in-line string macros [`progmem_str`]
+//! (yielding a `&str`) and [`progmem_display`] (yielding some
+//! `impl Display + uDisplay`):
 //!
 //! ```rust
-//! #![feature(const_option)]
-//!
 //! use avr_progmem::progmem_str as F;
 //! use avr_progmem::progmem_display as D;
 //!
-//! // Or you use directly the `Display`/`uDisplay` impl on `PmString`
-//! // which uses the chars-iterator internally
-//! use ufmt::uWrite;
+//! fn foo<W: ufmt::uWrite>(writer: &mut W) {
+//!     // In-line string as temporary `&str`
+//!     writer.write_str(F!("Hello 大賢者"));
+//!
+//!     // In-line string as some `impl Display + uDisplay`
+//!     #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
+//!     ufmt::uwrite!(writer, "{}", D!("Hello 大賢者"));
+//! }
+//! #
+//! # use ufmt::uWrite;
 //! # struct MyWriter;
-//! # impl uWrite for MyWriter {
+//! # impl ufmt::uWrite for MyWriter {
 //! #     type Error = ();
 //! #     fn write_str(&mut self, _s: &str) -> Result<(),()> {
 //! #         Ok(()) // ignore input
 //! #     }
 //! # }
-//! let mut writer =
-//! #   MyWriter
-//!     /* SNIP */;
+//! # let mut writer = MyWriter;
+//! # foo(&mut writer);
+//! ```
 //!
-//! // In-line string as temporary `&str`
-//! writer.write_str(F!("Hello 大賢者"));
+//! You can also use arbitrary `&str`-yielding expression, including loading
+//! huge strings from files, just don't use `PmString::load` nor `progmem_str`
+//! with huge strings (because if it is bigger than 255 bytes, it will panic).
 //!
-//! // In-line string as some `impl Display + uDisplay`
-//! #[cfg(feature = "ufmt")] // requires the `ufmt` crate feature
-//! ufmt::uwrite!(&mut writer, "{}", D!("Hello 大賢者"));
+//! ```rust
+//! use avr_progmem::progmem;
+//! use avr_progmem::progmem_display as D;
+//!
+//! progmem! {
+//!     // Text too large to fit in the RAM of a Arduino Uno
+//!     static progmem string HUGE_TEXT = include_str!("../examples/test_text.txt");
+//! }
+//! println!("{}", HUGE_TEXT);
+//!
+//! // In-line a huge string from a file
+//! println!("{}", D!(include_str!("../examples/test_text.txt")));
 //! ```
 //!
 
@@ -166,10 +179,10 @@ use core::fmt;
 use core::ops::Deref;
 
 use crate::wrapper::PmIter;
-use crate::ProgMem;
+use crate::wrapper::ProgMem;
 
 
-mod from_slice;
+pub(crate) mod from_slice;
 mod validations;
 
 
@@ -345,8 +358,6 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
-///
 /// use avr_progmem::progmem;
 /// use avr_progmem::string::PmString;
 /// use avr_progmem::string::LoadedString;
@@ -365,7 +376,6 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// assert_eq!("dai 大賢者 kenja", &*loaded)
 /// ```
 ///
-#[repr(transparent)]
 #[non_exhaustive] // SAFETY: this struct must not be publicly constructible
 pub struct PmString<const N: usize> {
 	/// The inner UTF-8 string as byte array in progmem.
@@ -379,43 +389,7 @@ pub struct PmString<const N: usize> {
 impl<const N: usize> PmString<N> {
 	/// Creates a new byte array from the given string
 	///
-	/// # Safety
-	///
-	/// This function is only sound to call, if the value is
-	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem.data"]`.
-	///
 	/// You are encouraged to use the [`progmem`] macro instead.
-	pub const unsafe fn new(s: &str) -> Option<Self> {
-		Self::from_bytes(s.as_bytes())
-	}
-
-	/// Wraps the given byte slice
-	///
-	/// # Safety
-	///
-	/// This function is only sound to call, if the value is
-	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem.data"]`.
-	///
-	/// Additionally, the given byte slice must contain valid UTF-8.
-	pub const unsafe fn from_bytes(bytes: &[u8]) -> Option<Self> {
-		let res = from_slice::array_ref_try_from_slice(bytes);
-
-		match res {
-			Ok(array) => {
-				let array = *array;
-				unsafe {
-					// SAFETY: the caller ensures that this value is in progmem
-					// and the bytes are valid UTF-8
-					Some(Self::from_array(array))
-				}
-			},
-			Err(_e) => None,
-		}
-	}
-
-	/// Wraps the given byte array
 	///
 	/// # Safety
 	///
@@ -424,20 +398,7 @@ impl<const N: usize> PmString<N> {
 	/// `#[link_section = ".progmem.data"]`.
 	///
 	/// The give byte array must contain valid UTF-8.
-	///
-	pub const unsafe fn from_array(array: [u8; N]) -> Self {
-		/* TODO: Use this once it becomes const fn
-		match core::str::from_utf8(&array) {
-			Ok(_) => (),
-			Err(_) => panic!("Not UTF-8"),
-		};
-		*/
-
-		let pm = unsafe {
-			// SAFETY: the caller ensures that this value is in progmem
-			ProgMem::new(array)
-		};
-
+	pub const unsafe fn new(pm: ProgMem<[u8; N]>) -> Self {
 		// SAFETY: the caller ensures that the bytes are valid UTF-8
 		Self {
 			pm_utf8_array: pm,
@@ -563,7 +524,7 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 
 
 
-/// Define a string in progmem usable as temporary `&str`
+/// Define a single-use string in progmem usable as temporary `&str`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as by [`LoadedString`] and load it here from progmem into a
@@ -586,7 +547,6 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
 /// use avr_progmem::progmem_str as F;
 /// use ufmt::uWrite;
 ///
@@ -617,7 +577,7 @@ macro_rules! progmem_str {
 }
 
 
-/// Define a string in progmem usable as `impl Display + uDisplay`
+/// Define a single-use string in progmem usable as `impl Display + uDisplay`
 ///
 /// This is a short-cut macro to create an ad-hoc static storing the given
 /// string literal as a [`PmString`] and return it.
@@ -642,7 +602,6 @@ macro_rules! progmem_str {
 /// # Example
 ///
 /// ```rust
-/// #![feature(const_option)]
 /// use avr_progmem::progmem_display as D;
 /// use ufmt::uWrite;
 ///

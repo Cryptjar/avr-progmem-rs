@@ -6,9 +6,6 @@
 // Define no_std only for AVR
 #![cfg_attr(target_arch = "avr", no_std)]
 #![cfg_attr(target_arch = "avr", no_main)]
-//
-// To unwrap the Option in const context
-#![feature(const_option)]
 
 
 use avr_progmem::progmem; // The macro

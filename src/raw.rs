@@ -52,8 +52,9 @@ use cfg_if::cfg_if;
 ///
 /// # Safety
 ///
-/// The given point must be valid in the program domain which in AVR normal
-/// pointers (to data) are NOT, because they point into the data domain.
+/// The given point must be valid in the program domain.
+/// Notice that in AVR normal pointers (to data) are into the data domain,
+/// NOT the program domain.
 ///
 /// Typically only function pointers (which make no sense here) and pointer to
 /// or into statics that are defined to be stored into progmem are valid.
@@ -95,16 +96,26 @@ pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 			// Just output the read value
 			res
 
-		} else {
+		} else if #[cfg(not(target_arch = "avr"))] {
 			// This is the non-AVR dummy.
 			// We have to assume that otherwise a normal data or text segment
 			// would be used, and thus that it is actually save to access it
 			// directly!
 
-			// Notice the above assumption fails and results in UB for any other
-			// Harvard architecture other than AVR.
-
-			*p_addr
+			unsafe {
+				// SAFETY: we are not on AVR, thus all data must be in some
+				// sort of data domain, because we only support the special
+				// program domain on AVR.
+				//
+				// Consequently, it is sound to just dereference the pointer
+				// to data.
+				*p_addr
+			}
+		} else {
+			// Special case, this neither possibly documentation on AVR, any
+			// it case is problematic, so if we reach this, we just abort via
+			// panic.
+			unreachable!("You should not execute code, compiled in `doc` mode");
 		}
 	}
 }
@@ -154,8 +165,16 @@ where
 	for i in 0..size_bytes {
 		let i: isize = i.into();
 
-		let value = read_byte(p_addr_bytes.offset(i));
-		out_bytes.offset(i).write(value);
+		let value = unsafe {
+			// SAFETY: The caller must ensure that `p_addr` points into the
+			// program domain.
+			read_byte(p_addr_bytes.offset(i))
+		};
+		unsafe {
+			// SAFETY: The caller must ensure that `size_bytes` of `out` are
+			// to write to (data-domain) and are valid for `T`.
+			out_bytes.offset(i).write(value);
+		}
 	}
 }
 
@@ -266,18 +285,29 @@ unsafe fn read_asm_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8) {
 				: "cc", "memory"
 			);
 
-		} else {
-			// Here, we are on a non-AVR platform.
-			// We just use normal data or text segment, and thus that it is
-			// actually save to just access the data.
+		} else if #[cfg(not(target_arch = "avr"))] {
+			// This is the non-AVR dummy.
+			// We have to assume that otherwise a normal data or text segment
+			// would be used, and thus that it is actually save to access it
+			// directly!
 
 			// Ignore the unused vars:
 			let _ = size_bytes;
 
-			// Now, just copy the bytes from p_addr to out
-			// It is save by the way, because we require the user to give use
-			// pointer valid for exactly that case.
-			core::ptr::copy(p_addr, out, len as usize);
+			unsafe {
+				// SAFETY: we are not on AVR, thus all data must be in some
+				// sort of data domain, because we only support the special
+				// program domain on AVR.
+				//
+				// Consequently, it is sound to just dereference the pointers
+				// to data.
+				core::ptr::copy(p_addr, out, len as usize);
+			}
+		} else {
+			// Special case, this neither possibly documentation on AVR, any
+			// it case is problematic, so if we reach this, we just abort via
+			// panic.
+			unreachable!("You should not execute code, compiled in `doc` mode");
 		}
 	}
 }
@@ -312,9 +342,17 @@ where
 {
 	cfg_if! {
 		if #[cfg(feature = "lpm-asm-loop")] {
-			read_asm_loop_raw(p_addr, out, len)
+			unsafe {
+				// SAFETY: The caller must ensuer the validity of the pointers
+				// and their domains.
+				read_asm_loop_raw(p_addr, out, len)
+			}
 		} else {
-			read_byte_loop_raw(p_addr, out, len)
+			unsafe {
+				// SAFETY: The caller must ensuer the validity of the pointers
+				// and their domains.
+				read_byte_loop_raw(p_addr, out, len)
+			}
 		}
 	}
 }
@@ -426,16 +464,20 @@ where
 
 	let res: *mut T = buffer.as_mut_ptr();
 
-	// The soundness of this call is directly derived from the prerequisite as
-	// defined by the Safety section of this function.
-	//
-	// Additionally, the use of the MaybeUninit there is also sound, because it
-	// only written to and never read and not even a Rust reference is created
-	// to it.
-	read_value_raw(p_addr, res, 1);
+	unsafe {
+		// SAFETY: The soundness of this call is directly derived from the
+		// prerequisite as defined by the Safety section of this function.
+		//
+		// Additionally, the use of the MaybeUninit there is also sound, because it
+		// only written to and never read and not even a Rust reference is created
+		// to it.
+		read_value_raw(p_addr, res, 1);
+	}
 
-	// After `read_value_raw` returned, it wrote an entire `T` into the `res`
-	// pointer, which is baked by this `buffer`. Thus it is now properly
-	// initialized, and this call is sound.
-	buffer.assume_init()
+	unsafe {
+		// SAFETY: After `read_value_raw` returned, it wrote an entire `T` into
+		// the `res` pointer, which is baked by this `buffer`.
+		// Thus it is now properly initialized, and this call is sound.
+		buffer.assume_init()
+	}
 }

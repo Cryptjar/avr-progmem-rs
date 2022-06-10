@@ -9,7 +9,7 @@
 
 use avr_progmem::progmem;
 use avr_progmem::string::LoadedString;
-use avr_progmem::ProgMem;
+use avr_progmem::wrapper::ProgMem;
 
 progmem! {
 	// Should notify that we should use the `progmem string` rule instead

@@ -1,23 +1,24 @@
 //! Best-effort safe wrapper for progmem.
 //!
-//! This module offers the [`ProgMem`] struct that wraps a value in progmem,
-//! and only gives access to this value via methods that first load the value
+//! This module offers the [`ProgMem`] struct that wraps pointers into progmem,
+//! and only gives access to that value via methods that first load the value
 //! into the normal data memory domain.
 //! This is also the reason why the value must be `Copy` and is always returned
 //! by-value instead of by-reference (since the value is not in the data memory
 //! where it could be referenced).
 //!
 //! Since the `ProgMem` struct loads the value using special instructions,
-//! it must actually be in progmem, otherwise it would be
-//! **undefined behavior**, therefore, its constructor is `unsafe` where the
-//! caller must guarantee that it is indeed stored in progmem.
+//! it really must be in progmem, otherwise it would be **undefined behavior**
+//! to use any of its methods.
+//! Therefore, its constructor is `unsafe` where the
+//! caller must guarantee that the given pointer truly points to a valid value
+//! stored in progmem.
 //!
-//! As further convenience, the [`progmem`] macro is offered that will create
-//! a `static` in progmem and wrap the given value in the [`ProgMem`] struct
-//! for you.
+//! As convenience, the [`progmem!`] macro is offered that will create
+//! a `static` in progmem with the given value and wrap a pointer to it in the
+//! [`ProgMem`] struct for you.
 
 
-use core::convert::TryInto;
 
 use crate::raw::read_value;
 
@@ -25,69 +26,92 @@ use crate::raw::read_value;
 
 /// Best-effort safe wrapper around a value in program memory.
 ///
-/// This type wraps a value that is stored in program memory, and offers safe
-/// functions to load those values from program memory into the data memory (or
-/// at least some registers).
+/// This type wraps a pointer to a value that is stored in program memory,
+/// and offers safe functions to [`load`](ProgMem::load) that value from
+/// program memory into the data memory domain from where it can be normally
+/// used.
 ///
-/// Since its constructer is the single most critical point in its API, it is
-/// `unsafe`, despite it is supposed to be a safe wrapper (hence the
+/// Since its constructor is the single most critical point in its API,
+/// it is `unsafe`, despite it is supposed to be a safe wrapper (hence the
 /// 'best-effort' notation).
+/// The caller of the constructor therefore must ensure that the supplied
+/// pointer points to a valid value stored in program memory.
 ///
-/// However, there is a rather simple way to make is sound, and that is defining
-/// the `#[link_section = ".progmem.data"]` (or `".text"`) on a static that contains
-/// this struct. And since its that simple, a macro `progmem!` is provided that
-/// will ensure this and should be always used to obtain a `ProgMem` instance
-/// in the first place.
+/// Consequently, the only way to use this struct soundly is to define a
+/// `static` with the `#[link_section = ".progmem.data"]` attribute on it and
+/// pass a pointer to that `static` to `ProgMem::new`.
+/// However, having an accessible `static` around that is stored in progmem
+/// is a very dangerous endeavor.
+///
+/// In order to make working with progmem safer and more convenient,
+/// consider using the [`progmem!`] macro, that will put the given data
+/// into a hidden `static` in progmem and provide you with an accessible static
+/// containing the pointer to it wrapped in `ProgMem`.
 ///
 ///
 /// # Safety
 ///
-/// This type is a best-effort safe, thus it interface with unsafe Rust given
-/// some invariants (like any other safe wrapper).
+/// The `target` pointer in this struct must point to a valid object of type
+/// `T` that is stored in the program memory domain.
+/// The object must be initialized, readable, and immutable (i.e. it must not
+/// be changed).
+/// Also the `target` pointer must be valid for the `'static` lifetime.
 ///
-/// The important and obvious invariant is that all values of the struct
-/// (instances) must be stored in the program memory. Since that is a property
-/// that the compiler (as of now) can not determine or assert or anything, it
-/// can't even be asserted, so far, the constructor is the central most unsafe
-/// point of this type.
-/// But once established it can't change (for statics at least),
-/// thus the only unsafe part of this type is the constructor where the user
-/// has to guarantee that it is indeed stored in a `static` in progmem.
+/// However, the above requirement only applies to the AVR architecture
+/// (`#[cfg(target_arch = "avr")]`), because otherwise normal data access
+/// primitives are used. This means that the value must be stored in the
+/// regular data memory domain for ALL OTHER architectures! This still
+/// holds, even if such other architecture is of the Harvard architecture,
+/// because this is an AVR-only crate, not a general Harvard architecture
+/// crate!
 ///
-/// Notice that if you got a `static mut` it is unsafe from a start so such a
-/// safe wrapper is of little use, and still then has the problem, that it is
-/// totally unsound to move it out of the static (e.g. using `std::mem::swap`
-/// on it).
-///
-/// Therefore, only a immutable `static` in the correct memory segment can be
-/// considered to be a correct location for it.
-///
-#[repr(transparent)]
-pub struct ProgMem<T>(T);
+#[non_exhaustive] // SAFETY: Must not be publicly creatable
+pub struct ProgMem<T> {
+	/// Points to some `T` in progmem.
+	///
+	/// # Safety
+	///
+	/// See the struct doc.
+	target: *const T,
+}
+
+unsafe impl<T> Send for ProgMem<T> {
+	// SAFETY: pointers per-se are sound to send & share.
+	// Further more, we will never mutate the underling value, thus `ProgMem`
+	// can be considered as some sort of sharable `'static` "reference".
+	// Thus it can be shared and transferred between threads.
+}
+
+unsafe impl<T> Sync for ProgMem<T> {
+	// SAFETY: pointers per-se are sound to send & share.
+	// Further more, we will never mutate the underling value, thus `ProgMem`
+	// can be considered as some sort of sharable `'static` "reference".
+	// Thus it can be shared and transferred between threads.
+}
 
 impl<T> ProgMem<T> {
 	/// Construct a new instance of this type.
 	///
-	/// This struct is a wrapper type for data in the program code memory
-	/// domain. Therefore when constructing this struct, it must be guaranteed
-	/// to uphold this requirement! This contract is expressed by the fact that
-	/// this function is `unsafe`. Also see the Safety section for details.
+	/// This struct is a pointer wrapper for data in the program memory domain.
+	/// Therefore when constructing this struct, it must be guaranteed
+	/// that the pointed data is stored in progmem!
+	/// This contract is expressed by the fact that this function is `unsafe`.
+	/// See the Safety section for details.
 	///
-	/// To simplify, there is a macro `progmem!` which creates a static and
-	/// ensures that it is stored indeed in the program code memory domain, and
-	/// then makes a call to this function to wrap that static. A user of this
-	/// crate should always prefer using the `progmem!` macro to obtain a
-	/// `ProgMem` value!
+	/// You should not need to call this function directly.
+	/// It is recommended to use the [`progmem!`] macro instead (which calls
+	/// this constructor for you, while enforcing its contract.
+	///
 	///
 	/// # Safety
 	///
-	/// The `ProgMem` wrapper is build around the invariant that itself an thus
-	/// its inner value are stored in the program code memory domain (on the
-	/// AVR architecture).
+	/// The `ProgMem` wrapper is build around the invariant that the wrapped
+	/// pointer is stored in the program code memory domain (on the AVR
+	/// architecture).
 	///
-	/// That means that this function is only sound to call, if the value is
-	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem.data"]`.
+	/// That means that this function is only sound to call, if the value to
+	/// which `target` points is stored in a `static` that is stored in progmem,
+	/// e.g. by using the attribute `#[link_section = ".progmem.data"]`.
 	///
 	/// However, the above requirement only applies to the AVR architecture
 	/// (`#[cfg(target_arch = "avr")]`), because otherwise normal data access
@@ -97,8 +121,10 @@ impl<T> ProgMem<T> {
 	/// because this is an AVR-only crate, not a general Harvard architecture
 	/// crate!
 	///
-	pub const unsafe fn new(t: T) -> Self {
-		ProgMem(t)
+	pub const unsafe fn new(target: *const T) -> Self {
+		ProgMem {
+			target,
+		}
 	}
 }
 
@@ -114,7 +140,7 @@ impl<T: Copy> ProgMem<T> {
 	///
 	/// Also notice, if you really hit this limit, you would need 256+ bytes on
 	/// your stack, on the Arduino Uno (at least) that means that you might be
-	/// close to stack overflow. Thus it might be better to restructure your
+	/// close to a stack overflow. Thus it might be better to restructure your
 	/// data, so you can store it as an array of something, than you can use
 	/// the [`load_at`] and [`load_sub_array`] methods instead.
 	///
@@ -122,13 +148,10 @@ impl<T: Copy> ProgMem<T> {
 	/// [`load_sub_array`]: struct.ProgMem.html#method.load_sub_array
 	///
 	pub fn load(&self) -> T {
-		// Get the actual address of the value to load
-		let p_addr = &self.0;
-
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
 		// in the progmem domain, which is what `read_value` requires from us.
-		unsafe { read_value(p_addr) }
+		unsafe { read_value(self.target) }
 	}
 
 	/// Return the raw pointer to the inner value.
@@ -137,8 +160,11 @@ impl<T: Copy> ProgMem<T> {
 	/// domain! It may never be dereferenced via the default Rust operations.
 	/// That means a `unsafe{*pm.get_inner_ptr()}` is **undefined behavior**!
 	///
-	pub fn ptr(&self) -> *const T {
-		&self.0
+	/// Instead, if you want to use the pointer, you may want to use one of
+	/// the "raw" functions, see the [raw](crate::raw) module.
+	///
+	pub fn as_ptr(&self) -> *const T {
+		self.target
 	}
 }
 
@@ -146,7 +172,7 @@ impl<T: Copy> ProgMem<T> {
 impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// Load a single element from the inner array.
 	///
-	/// This method is analog to a slice indexing `self.inner[idx]`, so the
+	/// This method is analog to a slice indexing `self.load()[idx]`, so the
 	/// same requirements apply, like the index `idx` should be less then the
 	/// length `N` of the array, otherwise a panic will be risen.
 	///
@@ -165,9 +191,13 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// as it would be with [`load`](Self::load).
 	///
 	pub fn load_at(&self, idx: usize) -> T {
-		// Just take a reference to the selected element.
-		// Notice that this will execute a bounds check.
-		let addr: &T = &self.0[idx];
+		// SAFETY: check that `idx` is in bounds
+		assert!(idx < N, "Given index is out of bounds");
+
+		let first_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let element_ptr = first_element_ptr.wrapping_add(idx);
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -175,20 +205,19 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		//
 		// Also notice that the slice-indexing above gives us a bounds check.
 		//
-		unsafe { read_value(addr) }
+		unsafe { read_value(element_ptr) }
 	}
 
 	/// Loads a sub array from the inner array.
 	///
-	/// This method is analog to a sub-slicing `self.inner[idx..(idx+M)]` but
+	/// This method is analog to a sub-slicing `self.load()[idx..(idx+M)]` but
 	/// returning an owned array instead of a slice, simply because it has to
 	/// copy the data anyway from the progmem into the data domain (i.e. the
 	/// stack).
 	///
 	/// Also notice, that since this crate is intended for AVR
 	/// micro-controllers, static arrays are generally preferred over
-	/// dynamically allocated types such as a `Vec` (as of now (mid-2020) there
-	/// isn't even a good way to get a `Vec` on AVR in Rust).
+	/// dynamically allocated types such as a `Vec`.
 	///
 	///
 	/// # Panics
@@ -197,20 +226,32 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// length `N` of the inner array, or the end index `idx+M` is grater than
 	/// the length `N` of the inner array.
 	///
-	/// This method also panics, if the size of the value (i.e. `size_of::<[T;M]>()`)
-	/// is beyond 255 bytes.
+	/// This method also panics, if the size of the value
+	/// (i.e. `size_of::<[T;M]>()`) is beyond 255 bytes.
 	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
 	///
 	pub fn load_sub_array<const M: usize>(&self, start_idx: usize) -> [T; M] {
-		assert!(M <= N);
+		// Just a check to give a nicer panic message
+		assert!(
+			M <= N,
+			"The sub array can not be grater than the source array"
+		);
 
-		// Make sure that we convert from &[T] to &[T;M] without constructing
-		// an actual [T;M], because we MAY NOT LOAD THE DATA YET!
-		// Also notice, that this sub-slicing dose ensure that the bound are
-		// correct.
-		let slice: &[T] = &self.0[start_idx..(start_idx + M)];
-		let array: &[T; M] = slice.try_into().unwrap();
+		// SAFETY: bounds check, the last element of the sub array must
+		// still be within the source array (i.e. self)
+		assert!(
+			start_idx + M <= N,
+			"The sub array goes beyond the end of the source array"
+		);
+
+		let first_source_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let first_output_element_ptr = first_source_element_ptr.wrapping_add(start_idx);
+
+		// Pointer into as sub array into the source
+		let sub_array_ptr: *const [T; M] = first_output_element_ptr.cast();
 
 		// This is safe, because the invariant of this struct demands that
 		// this value (i.e. self and thus also its inner value) are stored
@@ -218,7 +259,7 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		//
 		// Also notice that the sub-slicing above gives us a bounds check.
 		//
-		unsafe { read_value(array) }
+		unsafe { read_value(sub_array_ptr) }
 	}
 
 	/// Lazily iterate over all elements
@@ -418,17 +459,15 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 /// ## Examples
 ///
 /// ```rust
-/// #![feature(const_option)]
-///
 /// use avr_progmem::progmem;
 ///
 /// progmem! {
 ///     /// A static string stored in program memory.
-///     static progmem string TEXT = "Unicode text: 🦀";
+///     static progmem string TEXT = "Unicode text: 大賢者";
 /// }
 ///
 /// let text = TEXT.load();
-/// assert_eq!("Unicode text: 🦀", &*text);
+/// assert_eq!("Unicode text: 大賢者", &*text);
 /// ```
 ///
 #[macro_export]
@@ -462,6 +501,7 @@ macro_rules! progmem {
 		// Use an anonymous constant to scope the types used for the warning.
 		const _ : () = {
 			#[deprecated = concat!("Prefer using the special `PmString` rule. Try: ", stringify!($vis), " static progmem string ", stringify!($name), " = ", stringify!($value), ";")]
+			#[allow(non_camel_case_types)]
 			struct $name;
 
 			let _ = $name;
@@ -489,6 +529,7 @@ macro_rules! progmem {
 		// Use an anonymous constant to scope the types used for the warning.
 		const _ : () = {
 			#[deprecated = "You should not use a reference type for progmem, because this way only the reference itself will be in progmem, whereas the underlying data will not be in progmem!"]
+			#[allow(non_camel_case_types)]
 			struct $name;
 
 			let _ = $name;
@@ -528,6 +569,15 @@ macro_rules! progmem {
 }
 
 
+#[doc(hidden)]
+pub const fn array_from_str<const N: usize>(s: &str) -> [u8; N] {
+	let array_ref = crate::string::from_slice::array_ref_try_from_slice(s.as_bytes());
+	match array_ref {
+		Ok(r) => *r,
+		Err(_) => panic!("Invalid array size"),
+	}
+}
+
 
 /// Only for internal use. Use the `progmem!` macro instead.
 #[doc(hidden)]
@@ -538,25 +588,46 @@ macro_rules! progmem_internal {
 		$( #[ $attr:meta ] )*
 		$vis:vis static progmem string $name:ident = $value:expr ;
 	} => {
-
-		// PmString must be stored in the progmem or text section!
-		// The link_section lets us define it:
-		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-
 		// User attributes
 		$(#[$attr])*
-		// The actual static definition
-		$vis static $name : $crate::string::PmString<{
+		// The facade static definition, this only contains a pointer and thus
+		// is NOT in progmem, which in turn makes it safe & sound to access this
+		// facade.
+		$vis static $name: $crate::string::PmString<{
 			// This bit runs at compile-time
 			let s: &str = $value;
 			s.len()
-		}> =
+		}> = {
+			// This inner hidden static contains the actual real raw value.
+			//
+			// SAFETY: it must be stored in the progmem or text section!
+			// The `link_section` lets us define that:
+			#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
+			static VALUE: [u8; {
+				// This bit runs at compile-time
+				let s: &str = $value;
+				s.len()
+			}] = $crate::wrapper::array_from_str( $value );
+
+			let pm = unsafe {
+				// SAFETY: This call is sound because we ensure with the above
+				// `link_section` attribute on `VALUE` that it is indeed
+				// in the progmem section.
+				$crate::wrapper::ProgMem::new(
+					// TODO: use the `addr_of` macro here!!!
+					& VALUE
+				)
+			};
+
+			// Just return the PmString wrapper around the local static
 			unsafe {
-				// SAFETY: This call is sound, be cause we ensure with the above
-				// link_section attribute that this value is indeed in the
-				// progmem section.
-				$crate::string::PmString::new( $value )
-			}.unwrap();
+				// SAFETY: This call is sound, because we started out with a
+				// `&str` thus the conent of `VALUE` must be valid UTF-8
+				$crate::string::PmString::new(
+					pm
+				)
+			}
+		};
 	};
 
 	// The rule creating an auto-sized progmem static via `ProgMem`
@@ -585,19 +656,28 @@ macro_rules! progmem_internal {
 		$( #[ $attr:meta ] )*
 		$vis:vis static progmem $name:ident : $ty:ty = $value:expr ;
 	} => {
-		// ProgMem must be stored in the progmem or text section!
-		// The link_section lets us define it:
-		#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
-
 		// User attributes
 		$(#[$attr])*
-		// The actual static definition
-		$vis static $name : $crate::ProgMem<$ty> =
+		// The facade static definition, this only contains a pointer and thus
+		// is NOT in progmem, which in turn makes it safe & sound to access this
+		// facade.
+		$vis static $name: $crate::wrapper::ProgMem<$ty> = {
+			// This inner hidden static contains the actual real raw value.
+			//
+			// SAFETY: it must be stored in the progmem or text section!
+			// The `link_section` lets us define that:
+			#[cfg_attr(target_arch = "avr", link_section = ".progmem.data")]
+			static VALUE: $ty = $value;
+
 			unsafe {
-				// SAFETY: This call is safe, be cause we ensure with the above
-				// link_section attribute that this value is indeed in the
-				// progmem section.
-				$crate::ProgMem::new( $value )
-			};
+				// SAFETY: This call is sound because we ensure with the above
+				// `link_section` attribute on `VALUE` that it is indeed
+				// in the progmem section.
+				$crate::wrapper::ProgMem::new(
+					// TODO: use the `addr_of` macro here!!!
+					& VALUE
+				)
+			}
+		};
 	};
 }

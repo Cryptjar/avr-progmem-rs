@@ -10,7 +10,10 @@ Progmem utilities for the AVR architectures.
 
 This crate provides unsafe utilities for working with data stored in
 the program memory of an AVR micro-controller. Additionally, it defines a
-'best-effort' safe wrapper struct [`ProgMem`] to simplify working with it.
+'best-effort' safe wrapper struct [`ProgMem`](https://docs.rs/avr-progmem/latest/avr-progmem/wrapper/struct.ProgMem.html)
+to simplify working with it,
+as well as a [`PmString`](https://docs.rs/avr-progmem/latest/avr-progmem/string/struct.PmString.html) wrapper for string
+handling.
 
 This crate is implemented only in Rust and some short assembly, it does NOT
 depend on the [`avr-libc`] or any other C-library. However, due to the use
@@ -44,7 +47,7 @@ appealing to use the program memory (also referred to as _progmem_) for
 storing constant values. However, due to the Harvard design, those values
 are not usable with normal instructions (i.e. those emitted from normal
 Rust code). Instead, special instructions are required to load data from
-the program code domain, i.e. the `lpm` (load _from_ program memory)
+the program code domain, such as the `lpm` (load \[from\] program memory)
 instruction. And because there is no way to emit it from Rust code, this
 crate uses inline assembly to emit that instruction.
 
@@ -57,7 +60,7 @@ this is `unsafe` in the context of Rust.
 # Loading Data from Program Memory
 
 The first part of this crate simply provides a few functions (e.g.
-[`read_byte`]) to load constant data (i.e. a Rust `static` that is
+[`read_byte`](https://docs.rs/avr-progmem/latest/avr-progmem/raw/fn.read_byte.html)) to load constant data (i.e. a Rust `static` that is
 immutable) from the program memory into the data domain, so that
 sub-sequentially it is normal usable data, i.e. as owned data on the stack.
 
@@ -67,11 +70,14 @@ functions which simply load a given pointer from the program memory are
 inherently `unsafe`.
 
 Notice that using a `&u8` reference might make things rather worse than
-safe. Because keeping a pointer/reference/address into the program memory
-as Rust reference might easily cause it to be dereferenced, even in safe
-code. But since that address is only valid in the program code domain (and
-Rust doesn't know about it) it would illegally load the address from the
-data memory, causing **undefined behavior**!
+safe.
+Because a reference can be easily dereferenced by safe code, which would be
+**undefined behavior** if that reference points into the program memory.
+Therefore, a Rust reference to a `static` that is stored in program memory
+must be considered hazardous, and it is recommended to only use raw pointers
+to those `static`s (if you happened to have a new Rust compiler version you
+can directly create raw pointers without references by using the
+[`addr_of!`](core::ptr::addr_of) macro).
 
 ## Example
 
@@ -96,21 +102,37 @@ assert_eq!(b'A', data);
 
 Since working with progmem data is inherently unsafe and rather
 difficult to do correctly, this crate introduces the best-effort 'safe'
-wrapper [`ProgMem`], that is supposed to only wrap data in progmem, thus
+wrapper [`ProgMem`](https://docs.rs/avr-progmem/latest/avr-progmem/wrapper/struct.ProgMem.html),
+that is supposed to only wrap data in progmem, thus
 offering only functions to load its content using the progmem loading
-function.
-The latter are fine and safe, given that the wrapper type really contains
-data in the program memory. Therefore, to keep that invariant up, the
-constructor is `unsafe`.
+function introduced above.
+Using these functions is sound, if that the wrapper data is really stored
+in the program memory. Therefore, to enforce this invariant,
+the constructor of `ProgMem` is `unsafe`.
 
-Yet to make that also easier, this crate provides the [`progmem!`] macro
-(it has to be a macro), which will create a static variable in program
-memory for you and wrap it in the `ProgMem` struct. It will ensure that the
-`static` will be stored in the program memory by defining the
-`#[link_section = ".progmem.data"]` attribute on it. This makes the load
-functions on that struct sound and additionally prevents users to
-accidentally access that `static` directly, which, since it is in progmem,
-would be fundamentally unsound.
+Additionally, since proper Rust references (unlike pointers) come with a lot
+special requirements, it should be considered hazardous to have a reference
+to data stored in program memory.
+Instead, only raw pointers to this kind of data should be kept,
+created e.g. via the [`addr_of!`](core::ptr::addr_of) macro
+(tho, it just did not exist back in `nightly-2021-01-07`).
+Consequently, the `ProgMem` just wrap a pointer to data in progmem,
+which in turn must be stored in a `static` marked with
+`#[link_section = ".progmem.data"]`.
+However, since, safe Rust can always create a "normal" Rust reference to any
+(accessible) `static`, it must be considered hazardous if not just unsound,
+to expose such a `static` to safe Rust code.
+
+To also make this easier (and less hazardous), this crate provides the
+[`progmem!`] macro, which will create a hidden `static` in program memory
+initialized with the data you give it,
+wrap it's pointer in the `ProgMem` struct,
+and put that wrapper into yet another (normal RAM) static, so you can
+access it.
+This will ensure that the `static` that is stored in program memory can not
+be referenced by safe Rust code (because it is not accessible),
+while the accessible `ProgMem` wrapper allows access to the underling data
+by loading it correctly from program memory.
 
 ## Example
 
@@ -119,49 +141,51 @@ use avr_progmem::progmem;
 
 // It will be wrapped in the ProgMem struct and expand to:
 // ```
-// #[link_section = ".progmem.data"]
-// static P_BYTE: ProgMem<u8> = unsafe { ProgMem::new(b'A') };
+// static P_BYTE: ProgMem<u8> = {
+//     #[link_section = ".progmem.data"]
+//     static INNER_HIDDEN: u8 = 42;
+//     unsafe { ProgMem::new(addr_of!(INNER_HIDDEN)) }
+// };
 // ```
-// Thus it is impossible for safe Rust to directly dereference/access it!
+// Thus it is impossible for safe Rust to directly access the progmem data!
 progmem! {
     /// Static byte stored in progmem!
-    static progmem P_BYTE: u8 = b'A';
+    static progmem P_BYTE: u8 = 42;
 }
 
 // Load the byte from progmem
-// It is still sound, because the `ProgMem` guarantees us that it comes
-// from the program code memory.
+// This is sound, because the `ProgMem` always uses the special operation to
+// load the data from program memory.
 let data: u8 = P_BYTE.load();
-assert_eq!(b'A', data);
+assert_eq!(42, data);
 ```
 
 
 # Strings
 
-Using strings such as `&str` with [`ProgMem`] is rather difficult, and
+Using strings such as `&str` with [`ProgMem`](https://docs.rs/avr-progmem/latest/avr-progmem/wrapper/struct.ProgMem.html)
+is rather difficult, and
 surprisingly hard if Unicode support is needed
 (see [issue #3](https://github.com/Cryptjar/avr-progmem-rs/issues/3)).
 Thus, to make working with string convenient the
-[`PmString`](string::PmString) struct is provided on top of [`ProgMem`].
+[`PmString`](string::PmString) struct is provided on top of
+[`ProgMem`](https://docs.rs/avr-progmem/latest/avr-progmem/wrapper/struct.ProgMem.html).
 
 [`PmString`](string::PmString) stores any given `&str` as statically sized
 UTF-8 byte array (with full Unicode support).
 To make its content usable, it provides a `Display` & `uDisplay`
-implementation, a lazy `char` iterator, and `load` function similar to
-[`ProgMem`], that yields a [`LoadedString`](string::LoadedString),
+implementation, a lazy [`chars`](string::PmString::chars) iterator,
+and [`load`](string::PmString::load) function similar to
+[`ProgMem`](https://docs.rs/avr-progmem/latest/avr-progmem/wrapper/struct.ProgMem.html)'s
+`load`,
+that yields a [`LoadedString`](string::LoadedString),
 which in turn defers to `&str`.
-
-Additionally, two special macros are provided similar to the `F` macro
-of the Arduino IDE, that allows to "mark" an string as to be stored in
-progmem while being returned at this place as a loaded `&str`.
 
 For more details see the [string](https://docs.rs/avr-progmem/latest/avr-progmem/string/) module.
 
 ## Example
 
 ```rust
-#![feature(const_option)]
-
 use avr_progmem::progmem;
 
 progmem! {
@@ -175,7 +199,13 @@ assert_eq!("Hello 大賢者", &*buffer);
 
 // Or you use directly the `Display` impl
 assert_eq!("Hello 大賢者", format!("{}", TEXT));
+```
 
+Additionally, two special macros are provided similar to the `F` macro
+of the Arduino IDE, that allows to "mark" a string as to be stored in
+progmem while being returned at this place as a loaded `&str`.
+
+```rust
 // Or you skip the static and use in-line progmem strings:
 use avr_progmem::progmem_str as F;
 use avr_progmem::progmem_display as D;
@@ -188,33 +218,29 @@ assert_eq!("Bar 大賢者", format!("{}", D!("Bar 大賢者")));
 ```
 
 If you enabled the `ufmt` crate feature (its a default feature),
-you can also use `uDisplay` instead of `Display`.
+you can also use `uDisplay` in addition to `Display`.
 
 ```rust
-#![feature(const_option)]
-
-use ufmt::uWrite;
-// Assuming you have some `uWrite`
-let mut writer =
-    /* SNIP */;
-
 use avr_progmem::progmem;
 use avr_progmem::progmem_str as F;
 use avr_progmem::progmem_display as D;
 
-progmem! {
-    // A simple Unicode string in progmem.
-    static progmem string TEXT = "Hello 大賢者";
+fn foo<W: ufmt::uWrite>(writer: &mut W) {
+    progmem! {
+        // A simple Unicode string in progmem.
+        static progmem string TEXT = "Hello 大賢者";
+    }
+
+    // You can use the `uDisplay` impl
+    ufmt::uwriteln!(writer, "{}", TEXT);
+
+    // Or use the in-line `&str`
+    writer.write_str(F!("Foo 大賢者\n"));
+
+    // Or the in-line `impl uDisplay`
+    ufmt::uwriteln!(writer, "{}", D!("Bar 大賢者"));
 }
-
-// You can use the `uDisplay` impl
-ufmt::uwrite!(&mut writer, "{}", TEXT);
-
-// Or use the in-line `&str`
-writer.write_str(F!("Foo 大賢者"));
-
-// Or the in-line `impl uDisplay`
-ufmt::uwrite!(&mut writer, "{}", D!("Bar 大賢者"));
+//
 ```
 
 
@@ -248,18 +274,20 @@ operation, so for instance `ProgMem<[u8;1024]>::load()` will panic, but
 accessing such a big type in smaller chunks e.g.
 `ProgMem<[u8;1024]>::load_sub_array::<[u8;128]>(512)` is perfectly fine
 because the to be loaded type `[u8;128]` is only 128 bytes in size.
+Notice that the same limitation holds for `PmString<N>::load()`
+(i.e. you can only use it if `N <= 255` holds.
+On the other hand, there is no such limitation on `PmString<N>::chars()`
+and `PmString`'s `Display`/`uDisplay` implementation,
+because those, just load each `char` individually
+(i.e. no more that 4 bytes at a time).
 
 Second, since this crate only uses the `lpm` instruction, which is limited
 by a 16-bit pointer, this crate may only be used with data stored in the
 lower 64 kiB of program memory. Since this property has not be tested it is
 unclear whether it will cause a panic or right-up undefined behavior, so be
-very wary when working with AVR chips having more then 64 kiB of program
+very wary when working with AVR chips that have more then 64 kiB of program
 memory.
-This second restriction, of course, dose not apply to non-AVR architectures.
 
-
-[`ProgMem`]: https://docs.rs/avr-progmem/latest/avr_progmem/struct.ProgMem.html
-[`read_byte`]: https://docs.rs/avr-progmem/latest/avr_progmem/fn.read_byte.html
 [`progmem!`]: https://docs.rs/avr-progmem/latest/avr_progmem/macro.progmem.html
 [`avr-libc`]: https://crates.io/crates/avr-libc
 [avr]: https://en.wikipedia.org/wiki/AVR_microcontrollers
