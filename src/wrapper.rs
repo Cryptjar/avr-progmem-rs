@@ -241,6 +241,11 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	pub fn iter(&self) -> PmIter<T, N> {
 		PmIter::new(self)
 	}
+
+	/// returns the length of the array
+	pub fn len(&self) -> usize {
+		N
+	}
 }
 
 
