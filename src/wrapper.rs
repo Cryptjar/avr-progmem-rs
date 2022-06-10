@@ -319,6 +319,15 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 	}
 }
 
+impl<'a, T: Copy, const N: usize> IntoIterator for &'a ProgMem<[T; N]> {
+	type IntoIter = PmIter<'a, T, N>;
+	type Item = T;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter()
+	}
+}
+
 
 /// Define a static in progmem.
 ///
