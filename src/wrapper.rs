@@ -278,6 +278,11 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	pub fn iter(&self) -> PmIter<T, N> {
 		PmIter::new(self)
 	}
+
+	/// returns the length of the array
+	pub fn len(&self) -> usize {
+		N
+	}
 }
 
 
@@ -311,6 +316,15 @@ impl<'a, T: Copy, const N: usize> Iterator for PmIter<'a, T, N> {
 		} else {
 			None
 		}
+	}
+}
+
+impl<'a, T: Copy, const N: usize> IntoIterator for &'a ProgMem<[T; N]> {
+	type IntoIter = PmIter<'a, T, N>;
+	type Item = T;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter()
 	}
 }
 
