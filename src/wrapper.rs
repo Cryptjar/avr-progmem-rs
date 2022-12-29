@@ -168,6 +168,28 @@ impl<T: Copy> ProgMem<T> {
 }
 
 /// Utilities to work with an array in progmem.
+impl<T, const N: usize> ProgMem<[T; N]> {
+	/// Get a reference to an element from the array, without loading it.
+	///
+	/// # Panics
+	///
+	/// This method panics, if the given index `idx` is grater or equal to the
+	/// length `N` of the outer array.
+	pub fn at(&self, idx: usize) -> ProgMem<T> {
+		// SAFETY: check that `idx` is in bounds
+		assert!(idx < N, "Given index is out of bounds");
+
+		let first_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let element_ptr = first_element_ptr.wrapping_add(idx);
+
+		ProgMem {
+			target: element_ptr,
+		}
+	}
+}
+
 impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// Load a single element from the inner array.
 	///
@@ -190,21 +212,8 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// as it would be with [`load`](Self::load).
 	///
 	pub fn load_at(&self, idx: usize) -> T {
-		// SAFETY: check that `idx` is in bounds
-		assert!(idx < N, "Given index is out of bounds");
-
-		let first_element_ptr: *const T = self.target.cast();
-
-		// Get a point to the selected element
-		let element_ptr = first_element_ptr.wrapping_add(idx);
-
-		// This is safe, because the invariant of this struct demands that
-		// this value (i.e. self and thus also its inner value) are stored
-		// in the progmem domain, which is what `read_value` requires from us.
-		//
-		// Also notice that the slice-indexing above gives us a bounds check.
-		//
-		unsafe { read_value(element_ptr) }
+		let item_wrapper = self.at(idx);
+		item_wrapper.load()
 	}
 
 	/// Loads a sub array from the inner array.
