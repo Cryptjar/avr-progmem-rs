@@ -16,6 +16,7 @@
 //! memory domain via the function of this module.
 
 
+#[cfg(all(target_arch = "avr", not(doc)))]
 use core::arch::asm;
 use core::mem::size_of;
 use core::mem::MaybeUninit;
