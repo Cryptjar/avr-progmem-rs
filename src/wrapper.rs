@@ -67,7 +67,7 @@ use crate::raw::read_value;
 /// crate!
 ///
 #[non_exhaustive] // SAFETY: Must not be publicly creatable
-pub struct ProgMem<T> {
+pub struct ProgMem<T: ?Sized> {
 	/// Points to some `T` in progmem.
 	///
 	/// # Safety
@@ -76,18 +76,33 @@ pub struct ProgMem<T> {
 	target: *const T,
 }
 
-unsafe impl<T> Send for ProgMem<T> {
+unsafe impl<T: ?Sized> Send for ProgMem<T> {
 	// SAFETY: pointers per-se are sound to send & share.
 	// Further more, we will never mutate the underling value, thus `ProgMem`
 	// can be considered as some sort of sharable `'static` "reference".
 	// Thus it can be shared and transferred between threads.
 }
 
-unsafe impl<T> Sync for ProgMem<T> {
+unsafe impl<T: ?Sized> Sync for ProgMem<T> {
 	// SAFETY: pointers per-se are sound to send & share.
 	// Further more, we will never mutate the underling value, thus `ProgMem`
 	// can be considered as some sort of sharable `'static` "reference".
 	// Thus it can be shared and transferred between threads.
+}
+
+impl<T: ?Sized> ProgMem<T> {
+	/// Return the raw pointer to the inner value.
+	///
+	/// Notice that the returned pointer is indeed a pointer into the progmem
+	/// domain! It may **never** be dereferenced via the default Rust operations.
+	/// That means a `unsafe{*pm.as_ptr()}` is **undefined behavior**!
+	///
+	/// Instead, if you want to use the pointer, you may want to use one of
+	/// the "raw" functions, see the [raw](crate::raw) module.
+	///
+	pub fn as_ptr(&self) -> *const T {
+		self.target
+	}
 }
 
 impl<T> ProgMem<T> {
@@ -151,19 +166,6 @@ impl<T: Copy> ProgMem<T> {
 		// this value (i.e. self and thus also its inner value) are stored
 		// in the progmem domain, which is what `read_value` requires from us.
 		unsafe { read_value(self.target) }
-	}
-
-	/// Return the raw pointer to the inner value.
-	///
-	/// Notice that the returned pointer is indeed a pointer into the progmem
-	/// domain! It may never be dereferenced via the default Rust operations.
-	/// That means a `unsafe{*pm.get_inner_ptr()}` is **undefined behavior**!
-	///
-	/// Instead, if you want to use the pointer, you may want to use one of
-	/// the "raw" functions, see the [raw](crate::raw) module.
-	///
-	pub fn as_ptr(&self) -> *const T {
-		self.target
 	}
 }
 
