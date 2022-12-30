@@ -168,6 +168,28 @@ impl<T: Copy> ProgMem<T> {
 }
 
 /// Utilities to work with an array in progmem.
+impl<T, const N: usize> ProgMem<[T; N]> {
+	/// Get a reference to an element from the array, without loading it.
+	///
+	/// # Panics
+	///
+	/// This method panics, if the given index `idx` is grater or equal to the
+	/// length `N` of the outer array.
+	pub fn at(&self, idx: usize) -> ProgMem<T> {
+		// SAFETY: check that `idx` is in bounds
+		assert!(idx < N, "Given index is out of bounds");
+
+		let first_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let element_ptr = first_element_ptr.wrapping_add(idx);
+
+		ProgMem {
+			target: element_ptr,
+		}
+	}
+}
+
 impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// Load a single element from the inner array.
 	///
@@ -190,21 +212,8 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// as it would be with [`load`](Self::load).
 	///
 	pub fn load_at(&self, idx: usize) -> T {
-		// SAFETY: check that `idx` is in bounds
-		assert!(idx < N, "Given index is out of bounds");
-
-		let first_element_ptr: *const T = self.target.cast();
-
-		// Get a point to the selected element
-		let element_ptr = first_element_ptr.wrapping_add(idx);
-
-		// This is safe, because the invariant of this struct demands that
-		// this value (i.e. self and thus also its inner value) are stored
-		// in the progmem domain, which is what `read_value` requires from us.
-		//
-		// Also notice that the slice-indexing above gives us a bounds check.
-		//
-		unsafe { read_value(element_ptr) }
+		let item_wrapper = self.at(idx);
+		item_wrapper.load()
 	}
 
 	/// Loads a sub array from the inner array.
@@ -279,6 +288,10 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		PmIter::new(self)
 	}
 
+	pub fn wrapper_iter(&self) -> PmWrapperIter<T, N> {
+		PmWrapperIter::new(self)
+	}
+
 	/// Returns the length of the array (i.e. `N`)
 	pub fn len(&self) -> usize {
 		N
@@ -330,6 +343,42 @@ impl<'a, T: Copy, const N: usize> IntoIterator for &'a ProgMem<[T; N]> {
 		self.iter()
 	}
 }
+
+/// An iterator over an array in progmem, without loading elements
+///
+/// Can be acquired via [`ProgMem::wrapper_iter`].
+pub struct PmWrapperIter<'a, T, const N: usize> {
+	progmem: &'a ProgMem<[T; N]>,
+	current_idx: usize,
+}
+
+impl<'a, T, const N: usize> PmWrapperIter<'a, T, N> {
+	/// Creates a new iterator over the given progmem array.
+	pub const fn new(pm: &'a ProgMem<[T; N]>) -> Self {
+		Self {
+			progmem: pm,
+			current_idx: 0,
+		}
+	}
+}
+
+impl<'a, T, const N: usize> Iterator for PmWrapperIter<'a, T, N> {
+	type Item = ProgMem<T>;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		// Check for iterator end
+		if self.current_idx < N {
+			// Load next item from progmem
+			let b = self.progmem.at(self.current_idx);
+			self.current_idx += 1;
+
+			Some(b)
+		} else {
+			None
+		}
+	}
+}
+
 
 
 /// Define a static in progmem.
