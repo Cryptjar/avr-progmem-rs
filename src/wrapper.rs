@@ -188,8 +188,22 @@ impl<T, const N: usize> ProgMem<[T; N]> {
 			target: element_ptr,
 		}
 	}
+
+	/// Iterate over all elements as wrappers.
+	///
+	/// Returns an iterator, which yields each element as a `ProgMem<T>`,
+	/// which can be subsequently loaded.
+	pub fn wrapper_iter(&self) -> PmWrapperIter<T, N> {
+		PmWrapperIter::new(self)
+	}
+
+	/// Returns the length of the array (i.e. `N`)
+	pub fn len(&self) -> usize {
+		N
+	}
 }
 
+/// Loading elements of an array in progmem.
 impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// Load a single element from the inner array.
 	///
@@ -286,15 +300,6 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	///
 	pub fn iter(&self) -> PmIter<T, N> {
 		PmIter::new(self)
-	}
-
-	pub fn wrapper_iter(&self) -> PmWrapperIter<T, N> {
-		PmWrapperIter::new(self)
-	}
-
-	/// Returns the length of the array (i.e. `N`)
-	pub fn len(&self) -> usize {
-		N
 	}
 }
 
