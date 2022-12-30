@@ -288,6 +288,10 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		PmIter::new(self)
 	}
 
+	pub fn wrapper_iter(&self) -> PmWrapperIter<T, N> {
+		PmWrapperIter::new(self)
+	}
+
 	/// Returns the length of the array (i.e. `N`)
 	pub fn len(&self) -> usize {
 		N
@@ -339,6 +343,42 @@ impl<'a, T: Copy, const N: usize> IntoIterator for &'a ProgMem<[T; N]> {
 		self.iter()
 	}
 }
+
+/// An iterator over an array in progmem, without loading elements
+///
+/// Can be acquired via [`ProgMem::wrapper_iter`].
+pub struct PmWrapperIter<'a, T, const N: usize> {
+	progmem: &'a ProgMem<[T; N]>,
+	current_idx: usize,
+}
+
+impl<'a, T, const N: usize> PmWrapperIter<'a, T, N> {
+	/// Creates a new iterator over the given progmem array.
+	pub const fn new(pm: &'a ProgMem<[T; N]>) -> Self {
+		Self {
+			progmem: pm,
+			current_idx: 0,
+		}
+	}
+}
+
+impl<'a, T, const N: usize> Iterator for PmWrapperIter<'a, T, N> {
+	type Item = ProgMem<T>;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		// Check for iterator end
+		if self.current_idx < N {
+			// Load next item from progmem
+			let b = self.progmem.at(self.current_idx);
+			self.current_idx += 1;
+
+			Some(b)
+		} else {
+			None
+		}
+	}
+}
+
 
 
 /// Define a static in progmem.
