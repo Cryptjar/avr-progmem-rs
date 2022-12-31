@@ -20,6 +20,9 @@
 
 
 
+use core::marker::Unsize;
+use core::ops::CoerceUnsized;
+
 use crate::raw::read_value;
 
 
@@ -75,6 +78,19 @@ pub struct ProgMem<T: ?Sized> {
 	/// See the struct doc.
 	target: *const T,
 }
+
+/// Implement clone by hand, because the derive variant adds a sized constraint
+///
+/// Also see: https://github.com/rust-lang/rust/issues/41481
+impl<T: ?Sized> Clone for ProgMem<T> {
+	fn clone(&self) -> Self {
+		// Just copy, using the below impl
+		*self
+	}
+}
+
+/// Implement copy by hand, because the derive variant adds a sized constraint
+impl<T: ?Sized> Copy for ProgMem<T> {}
 
 unsafe impl<T: ?Sized> Send for ProgMem<T> {
 	// SAFETY: pointers per-se are sound to send & share.
@@ -162,9 +178,9 @@ impl<T: Copy> ProgMem<T> {
 	/// [`load_sub_array`]: struct.ProgMem.html#method.load_sub_array
 	///
 	pub fn load(&self) -> T {
-		// This is safe, because the invariant of this struct demands that
-		// this value (i.e. self and thus also its inner value) are stored
-		// in the progmem domain, which is what `read_value` requires from us.
+		// This is safe, because the invariant of this struct guarantees that
+		// this value (i.e. target) is stored in the progmem domain,
+		// which is what `read_value` requires from us.
 		unsafe { read_value(self.target) }
 	}
 }
@@ -176,27 +192,19 @@ impl<T, const N: usize> ProgMem<[T; N]> {
 	/// # Panics
 	///
 	/// This method panics, if the given index `idx` is grater or equal to the
-	/// length `N` of the outer array.
+	/// length `N` of the array.
 	pub fn at(&self, idx: usize) -> ProgMem<T> {
-		// SAFETY: check that `idx` is in bounds
-		assert!(idx < N, "Given index is out of bounds");
-
-		let first_element_ptr: *const T = self.target.cast();
-
-		// Get a point to the selected element
-		let element_ptr = first_element_ptr.wrapping_add(idx);
-
-		ProgMem {
-			target: element_ptr,
-		}
+		// Just use the slice impl
+		let slice: ProgMem<[T]> = *self;
+		slice.at(idx)
 	}
 
 	/// Iterate over all elements as wrappers.
 	///
 	/// Returns an iterator, which yields each element as a `ProgMem<T>`,
 	/// which can be subsequently loaded.
-	pub fn wrapper_iter(&self) -> PmWrapperIter<T, N> {
-		PmWrapperIter::new(self)
+	pub fn wrapper_iter(&self) -> PmWrapperIter<T> {
+		PmWrapperIter::new(*self)
 	}
 
 	/// Returns the length of the array (i.e. `N`)
@@ -228,8 +236,8 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	/// as it would be with [`load`](Self::load).
 	///
 	pub fn load_at(&self, idx: usize) -> T {
-		let item_wrapper = self.at(idx);
-		item_wrapper.load()
+		// Just get the element wrapper and load it
+		self.at(idx).load()
 	}
 
 	/// Loads a sub array from the inner array.
@@ -292,7 +300,7 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 	///
 	/// # Panics
 	///
-	/// This method panics, if the size of an element (i.e. `size_of::<T>()`)
+	/// The returned iterator will panic, if the size of an element (i.e. `size_of::<T>()`)
 	/// is beyond 255 bytes.
 	/// However, this is currently just a implementation limitation, which may
 	/// be lifted in the future.
@@ -304,6 +312,92 @@ impl<T: Copy, const N: usize> ProgMem<[T; N]> {
 		PmIter::new(self)
 	}
 }
+
+/// Utilities to work with an slice wrapper.
+///
+/// You can obtain a slice wrapper by coercing an array wrapper.
+impl<T> ProgMem<[T]> {
+	/// Get a reference to an element from the array, without loading it.
+	///
+	/// # Panics
+	///
+	/// This method panics, if the given index `idx` is grater or equal to the
+	/// length of the slice.
+	pub fn at(&self, idx: usize) -> ProgMem<T> {
+		// SAFETY: check that `idx` is in bounds
+		assert!(idx < self.target.len(), "Given index is out of bounds");
+
+		// This sound, because `self.target` is in program domain and we checked
+		// above that `idx` is in bound, thus that element pointer is also
+		// valid and pointing into the program domain.
+		ProgMem {
+			// The `get_unchecked` is sound, because we checked above that `idx`
+			// is in bound.
+			target: unsafe { self.target.get_unchecked(idx) },
+		}
+	}
+
+	/// Iterate over all elements as wrappers.
+	///
+	/// Returns an iterator, which yields each element as a `ProgMem<T>`,
+	/// which can be subsequently loaded.
+	pub fn wrapper_iter(&self) -> PmWrapperIter<T> {
+		PmWrapperIter::new(*self)
+	}
+
+	/// Returns the length of the slice
+	pub fn len(&self) -> usize {
+		self.target.len()
+	}
+}
+
+/// Loading elements of an array in progmem.
+impl<T: Copy> ProgMem<[T]> {
+	/// Load a single element from the slice.
+	///
+	/// This method is analog to a slice indexing, thus the same requirements
+	/// apply: the index `idx` should be less then the length of the slice,
+	/// otherwise a panic will be risen.
+	///
+	///
+	/// # Panics
+	///
+	/// This method panics, if the given index `idx` is grater or equal to the
+	/// length of the slice.
+	///
+	/// This method also panics, if the size of the value (i.e. `size_of::<T>()`)
+	/// is beyond 255 bytes.
+	/// However, this is currently just a implementation limitation, which may
+	/// be lifted in the future.
+	///
+	/// Notice, that here `T` is the type of the elements not the entire slice.
+	///
+	pub fn load_at(&self, idx: usize) -> T {
+		// Just get the element wrapper and load it
+		self.at(idx).load()
+	}
+}
+
+
+/// Allows coercing a `ProgMem<T>` to a `ProgMem<U>`, where U might be unsized.
+///
+/// A classic example of this is coercing an array `ProgMem<[T; N]>` into a
+/// slice `ProgMem<[T]>`.
+///
+/// ```rust
+/// use avr_progmem::wrapper::ProgMem;
+/// use avr_progmem::progmem;
+///
+/// progmem!{
+///	    static progmem ARR: [u8; 3] = [1,2,3];
+/// }
+///
+/// // The array wrapper
+/// let arr: ProgMem<[u8; 3]> = ARR;
+/// // Coerced to a slice wrapper, just like that.
+/// let s: ProgMem<[u8]> = arr;
+/// ```
+impl<T: ?Sized, U: ?Sized> CoerceUnsized<ProgMem<U>> for ProgMem<T> where T: Unsize<U> {}
 
 
 /// An iterator over an array in progmem.
@@ -354,14 +448,14 @@ impl<'a, T: Copy, const N: usize> IntoIterator for &'a ProgMem<[T; N]> {
 /// An iterator over an array in progmem, without loading elements
 ///
 /// Can be acquired via [`ProgMem::wrapper_iter`].
-pub struct PmWrapperIter<'a, T, const N: usize> {
-	progmem: &'a ProgMem<[T; N]>,
+pub struct PmWrapperIter<T> {
+	progmem: ProgMem<[T]>,
 	current_idx: usize,
 }
 
-impl<'a, T, const N: usize> PmWrapperIter<'a, T, N> {
+impl<T> PmWrapperIter<T> {
 	/// Creates a new iterator over the given progmem array.
-	pub const fn new(pm: &'a ProgMem<[T; N]>) -> Self {
+	pub const fn new(pm: ProgMem<[T]>) -> Self {
 		Self {
 			progmem: pm,
 			current_idx: 0,
@@ -369,13 +463,13 @@ impl<'a, T, const N: usize> PmWrapperIter<'a, T, N> {
 	}
 }
 
-impl<'a, T, const N: usize> Iterator for PmWrapperIter<'a, T, N> {
+impl<T> Iterator for PmWrapperIter<T> {
 	type Item = ProgMem<T>;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		// Check for iterator end
-		if self.current_idx < N {
-			// Load next item from progmem
+		if self.current_idx < self.progmem.len() {
+			// Get next element wrapper
 			let b = self.progmem.at(self.current_idx);
 			self.current_idx += 1;
 

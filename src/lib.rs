@@ -5,6 +5,18 @@
 // As of now (mid 2022), inline assembly for AVR is still unstable.
 #![feature(asm_experimental_arch)]
 //
+// We to access the length of a slice pointer (for unsized `ProgMem`s)
+#![feature(slice_ptr_len)]
+//
+// We to access the address of elements of slice pointers (for unsized `ProgMem`s)
+#![feature(slice_ptr_get)]
+//
+// Allow to implement `CoerceUnsized` on `ProgMem`
+#![feature(coerce_unsized)]
+//
+// Needed for implementing `CoerceUnsized` on `ProgMem`
+#![feature(unsize)]
+//
 // Allows to document required crate features on items
 #![cfg_attr(doc, feature(doc_auto_cfg))]
 //
