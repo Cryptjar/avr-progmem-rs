@@ -375,7 +375,16 @@ impl<const N: usize> ufmt::uDisplay for LoadedString<N> {
 /// assert_eq!("dai 大賢者 kenja", &*loaded)
 /// ```
 ///
-#[non_exhaustive] // SAFETY: this struct must not be publicly constructible
+//
+//
+// SAFETY: this struct must not be publicly constructible
+#[non_exhaustive]
+//
+// Its just a pointer type, thus copy, clone & debug are fine (none of them
+// will access the progmem, that's what `Display` is for).
+#[derive(Copy, Clone, Debug)]
+// Also impl `uDebug` if enabled.
+#[cfg_attr(feature = "ufmt", derive(ufmt::derive::uDebug))]
 pub struct PmString<const N: usize> {
 	/// The inner UTF-8 string as byte array in progmem.
 	///

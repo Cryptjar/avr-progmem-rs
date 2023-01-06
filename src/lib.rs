@@ -107,7 +107,7 @@
 //! use core::ptr::addr_of;
 //!
 //! // This `static` must never be directly dereferenced/accessed!
-//! // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
+//! // So a `let data: u8 = P_BYTE;` ⚠️ is **undefined behavior**!!!
 //! /// Static byte stored in progmem!
 //! #[link_section = ".progmem.data"]
 //! static P_BYTE: u8 = b'A';

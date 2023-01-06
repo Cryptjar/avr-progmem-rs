@@ -23,6 +23,8 @@
 use core::marker::Unsize;
 use core::ops::CoerceUnsized;
 
+use derivative::Derivative;
+
 use crate::raw::read_value;
 
 
@@ -51,6 +53,13 @@ use crate::raw::read_value;
 /// into a hidden `static` in progmem and provide you with an accessible static
 /// containing the pointer to it wrapped in `ProgMem`.
 ///
+/// Since this is just a fancy immutable pointer type, it can always be
+/// copied/cloned (just copies the address). It also implements `Debug`,
+/// which simply prints the address (into progmem) of the wrapped value.
+/// And you can even coerce the pointed-to type e.g. from an statically sized
+/// array to a dynamically sized slice type (it also allow to coerce to a trait
+/// object, but those will not be useful at all).
+///
 ///
 /// # Safety
 ///
@@ -60,7 +69,7 @@ use crate::raw::read_value;
 /// be changed).
 /// Also the `target` pointer must be valid for the `'static` lifetime.
 ///
-/// However, the above requirement about the program memory domain only applies
+/// However, the requirement about the program memory domain only applies
 /// to the AVR architecture (`#[cfg(target_arch = "avr")]`),
 /// otherwise normal data access primitives are used.
 /// This means that the value must be stored in the
@@ -69,7 +78,18 @@ use crate::raw::read_value;
 /// because this is an AVR-only crate, not a general Harvard architecture
 /// crate!
 ///
-#[non_exhaustive] // SAFETY: Must not be publicly creatable
+//
+//
+// SAFETY: Must not be publicly creatable
+#[non_exhaustive]
+//
+// We use Derivative here to get rid of the constraint on the impls, which
+// a normal derive would add.
+#[derive(Derivative)]
+// This is just a pointer type/wrapper thus it is safe & sound to just copy it.
+// Notice, it will just copy the pointer (i.e. the address), thus `T` doesn't
+// even need to implement any of these traits.
+#[derivative(Copy(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 pub struct ProgMem<T: ?Sized> {
 	/// Points to some `T` in progmem.
 	///
@@ -79,18 +99,23 @@ pub struct ProgMem<T: ?Sized> {
 	target: *const T,
 }
 
-/// Implement clone by hand, because the derive variant adds a sized constraint
+
+/// Implement `uDebug` by hand, because the derive variant adds a sized constraint.
 ///
-/// Also see: https://github.com/rust-lang/rust/issues/41481
-impl<T: ?Sized> Clone for ProgMem<T> {
-	fn clone(&self) -> Self {
-		// Just copy, using the below impl
-		*self
+#[cfg(feature = "ufmt")]
+impl<T: ?Sized> ufmt::uDebug for ProgMem<T> {
+	fn fmt<W>(&self, fmt: &mut ufmt::Formatter<'_, W>) -> Result<(), W::Error>
+	where
+		W: ufmt::uWrite + ?Sized,
+	{
+		fmt.debug_struct("ProgMem")?
+			// It be better to just pass the pointer as is,
+			// however `ufmt` has - for what ever reason - a size constraint,
+			// so we first cast it down to a sized type.
+			.field("target", &self.target.cast::<()>())?
+			.finish()
 	}
 }
-
-/// Implement copy by hand, because the derive variant adds a sized constraint
-impl<T: ?Sized> Copy for ProgMem<T> {}
 
 unsafe impl<T: ?Sized> Send for ProgMem<T> {
 	// SAFETY: pointers per-se are sound to send & share.
