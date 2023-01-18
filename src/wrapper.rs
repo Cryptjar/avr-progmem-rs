@@ -352,13 +352,16 @@ impl<T> ProgMem<[T]> {
 		// SAFETY: check that `idx` is in bounds
 		assert!(idx < self.target.len(), "Given index is out of bounds");
 
+		let first_element_ptr: *const T = self.target.cast();
+
+		// Get a point to the selected element
+		let element_ptr = first_element_ptr.wrapping_add(idx);
+
 		// This sound, because `self.target` is in program domain and we checked
 		// above that `idx` is in bound, thus that element pointer is also
 		// valid and pointing into the program domain.
 		ProgMem {
-			// The `get_unchecked` is sound, because we checked above that `idx`
-			// is in bound.
-			target: unsafe { self.target.get_unchecked(idx) },
+			target: element_ptr,
 		}
 	}
 

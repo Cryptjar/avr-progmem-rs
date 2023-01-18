@@ -8,9 +8,6 @@
 // We to access the length of a slice pointer (for unsized `ProgMem`s)
 #![feature(slice_ptr_len)]
 //
-// We to access the address of elements of slice pointers (for unsized `ProgMem`s)
-#![feature(slice_ptr_get)]
-//
 // Allow to implement `CoerceUnsized` on `ProgMem`
 #![feature(coerce_unsized)]
 //
