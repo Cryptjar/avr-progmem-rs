@@ -37,6 +37,7 @@ use cfg_if::cfg_if;
 ///
 /// ```
 /// use avr_progmem::raw::read_byte;
+/// use core::ptr::addr_of;
 ///
 /// // This static must never be directly dereferenced/accessed!
 /// // So a `let data: u8 = P_BYTE;` is Undefined Behavior!!!
@@ -47,7 +48,7 @@ use cfg_if::cfg_if;
 /// // Load the byte from progmem
 /// // Here, it is sound, because due to the link_section it is indeed in the
 /// // program code memory.
-/// let data: u8 = unsafe { read_byte(&P_BYTE) };
+/// let data: u8 = unsafe { read_byte(addr_of!(P_BYTE)) };
 /// assert_eq!(b'A', data);
 /// ```
 ///
@@ -382,6 +383,7 @@ where
 ///
 /// ```
 /// use avr_progmem::raw::read_value;
+/// use core::ptr::addr_of;
 ///
 /// // This static must never be directly dereferenced/accessed!
 /// // So a `let data: [u8;11] = P_ARRAY;` is Undefined Behavior!!!
@@ -394,7 +396,7 @@ where
 /// // Load the bytes from progmem
 /// // Here, it is sound, because due to the link_section it is indeed in the
 /// // program code memory.
-/// let data: [u8;11] = unsafe { read_value(&P_ARRAY) };
+/// let data: [u8;11] = unsafe { read_value(addr_of!(P_ARRAY)) };
 /// assert_eq!(b"Hello World", &data);
 /// ```
 ///
