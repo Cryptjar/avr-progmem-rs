@@ -9,10 +9,10 @@
 #![feature(slice_ptr_len)]
 //
 // Allow to implement `CoerceUnsized` on `ProgMem`
-#![feature(coerce_unsized)]
+#![cfg_attr(feature = "unsize", feature(coerce_unsized))]
 //
 // Needed for implementing `CoerceUnsized` on `ProgMem`
-#![feature(unsize)]
+#![cfg_attr(feature = "unsize", feature(unsize))]
 //
 // Allows to document required crate features on items
 #![cfg_attr(doc, feature(doc_auto_cfg))]

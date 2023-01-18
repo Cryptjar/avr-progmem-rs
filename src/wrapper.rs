@@ -20,9 +20,6 @@
 
 
 
-use core::marker::Unsize;
-use core::ops::CoerceUnsized;
-
 use derivative::Derivative;
 
 use crate::raw::read_value;
@@ -58,7 +55,9 @@ use crate::raw::read_value;
 /// which simply prints the address (into progmem) of the wrapped value.
 /// And you can even coerce the pointed-to type e.g. from an statically sized
 /// array to a dynamically sized slice type (it also allow to coerce to a trait
-/// object, but those will not be useful at all).
+/// object, but those will not be useful at all), either using the
+/// [`as_slice`][ProgMem::as_slice] method, or by enabling the "unsize" crate
+/// feature that allows normal Rust coercing.
 ///
 ///
 /// # Safety
@@ -220,7 +219,7 @@ impl<T, const N: usize> ProgMem<[T; N]> {
 	/// length `N` of the array.
 	pub fn at(&self, idx: usize) -> ProgMem<T> {
 		// Just use the slice impl
-		let slice: ProgMem<[T]> = *self;
+		let slice: ProgMem<[T]> = self.as_slice();
 		slice.at(idx)
 	}
 
@@ -229,12 +228,48 @@ impl<T, const N: usize> ProgMem<[T; N]> {
 	/// Returns an iterator, which yields each element as a `ProgMem<T>`,
 	/// which can be subsequently loaded.
 	pub fn wrapper_iter(&self) -> PmWrapperIter<T> {
-		PmWrapperIter::new(*self)
+		PmWrapperIter::new(self.as_slice())
 	}
 
 	/// Returns the length of the array (i.e. `N`)
 	pub fn len(&self) -> usize {
 		N
+	}
+
+	/// Coerce this array wrapper into a slice wrapper.
+	///
+	/// Notice, if you enable the "unsize" crate feature, you can directly
+	/// coerce the `ProgMem` struct, otherwise you have to use this function
+	/// instead.
+	///
+	/// This analog to normal Rust coercing of arrays to slices.
+	/// Indeed, if you enable the crate feature "unsize", you can use normal
+	/// Rust coercing to get the same result.
+	///
+	/// # Examples
+	///
+	/// ```rust
+	/// use avr_progmem::wrapper::ProgMem;
+	/// use avr_progmem::progmem;
+	///
+	/// progmem!{
+	///	    static progmem ARR: [u8; 3] = [1,2,3];
+	/// }
+	///
+	/// // The array wrapper
+	/// let arr: ProgMem<[u8; 3]> = ARR;
+	/// // Coerced to a slice wrapper.
+	/// let s: ProgMem<[u8]> = arr.as_slice();
+	///
+	/// // If you enable the "unsize" crate feature, you can just coerce like that:
+	/// #[cfg(feature = "unsize")]
+	/// let s: ProgMem<[u8]> = arr;
+	/// ```
+	///
+	pub fn as_slice(&self) -> ProgMem<[T]> {
+		ProgMem {
+			target: self.target,
+		}
 	}
 }
 
@@ -410,7 +445,10 @@ impl<T: Copy> ProgMem<[T]> {
 /// Allows coercing a `ProgMem<T>` to a `ProgMem<U>`, where U might be unsized.
 ///
 /// A classic example of this is coercing an array `ProgMem<[T; N]>` into a
-/// slice `ProgMem<[T]>`.
+/// slice `ProgMem<[T]>`. Thus this impl is a generalization of the
+/// [`as_slice`][ProgMem::as_slice] method.
+///
+/// # Examples
 ///
 /// ```rust
 /// use avr_progmem::wrapper::ProgMem;
@@ -425,8 +463,11 @@ impl<T: Copy> ProgMem<[T]> {
 /// // Coerced to a slice wrapper, just like that.
 /// let s: ProgMem<[u8]> = arr;
 /// ```
-impl<T: ?Sized, U: ?Sized> CoerceUnsized<ProgMem<U>> for ProgMem<T> where T: Unsize<U> {}
-
+#[cfg(feature = "unsize")]
+impl<T: ?Sized, U: ?Sized> core::ops::CoerceUnsized<ProgMem<U>> for ProgMem<T> where
+	T: core::marker::Unsize<U>
+{
+}
 
 /// An iterator over an array in progmem.
 ///

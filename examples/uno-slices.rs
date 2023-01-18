@@ -11,6 +11,7 @@
 
 use avr_progmem::progmem; // The macro
 use avr_progmem::wrapper::ProgMem;
+use cfg_if::cfg_if;
 #[cfg(target_arch = "avr")]
 use panic_halt as _; // halting panic implementation for AVR
 
@@ -50,14 +51,31 @@ fn main() -> ! {
 	//
 	// In order to have the benefits of slices while the data is still in
 	// progmem, we can also just coerce the ProgMems of arrays into ProgMems of
-	// slices, just like that:
+	// slices:
 
-	let a_slice: ProgMem<[u8]> = ARRAY_A;
-	let b_slice: ProgMem<[u8]> = ARRAY_B;
-	let c_slice: ProgMem<[u8]> = ARRAY_C;
+	// Once we have slice wrappers, we can store them together e.g. in a array
+	let list_of_slices: [ProgMem<[u8]>; 3] = {
+		cfg_if! {
+			if #[cfg(feature = "unsize")] {
+				// Option 1: just coerce them to a slice wrapper
+				// but this requires the crate feature "unsize"
 
-	// Now they have the same type, and we can put them into a list.
-	let list_of_slices = [a_slice, b_slice, c_slice];
+				[
+					ARRAY_A,
+					ARRAY_B,
+					ARRAY_C,
+				]
+			} else {
+				// Option 2: convert them explicitly via the "as_slice" method
+
+				[
+					ARRAY_A.as_slice(),
+					ARRAY_B.as_slice(),
+					ARRAY_C.as_slice(),
+				]
+			}
+		}
+	};
 
 	// And for instance iterate through that list.
 	for (i, slice) in list_of_slices.iter().enumerate() {

@@ -35,6 +35,9 @@ default = ["lpm-asm-loop", "ufmt"]
 lpm-asm-loop = []
 # Enables some tweak to ease debugging, should not be use in production
 dev = []
+# Enables unsize utilities, such as wrapper coercing.
+# However, this requires additional nightly Rust features, which might be unstable.
+unsize = []
 
 [dependencies]
 cfg-if = "1.0"
