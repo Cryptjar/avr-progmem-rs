@@ -69,7 +69,8 @@
 //!
 //! The single-use macros are the most concise option, but also a rather
 //! special-case solution.
-//! `progmem_str` gives you are very temporary `&str` to an ad-hoc loaded
+//! [`progmem_str`](crate::progmem_str) gives you are very temporary `&str`
+//! to an ad-hoc loaded
 //! progmem string, so you can only pass it to a function call and you need
 //! enough RAM to store it.
 //! On the other hand, [`progmem_display`](crate::progmem_display) gives you
@@ -82,7 +83,7 @@
 //!
 //! # Examples
 //!
-//! Using [`PmString`] directly via the [`progmem`] macro:
+//! Using [`PmString`] directly via the [`progmem`](crate::progmem) macro:
 //!
 //! ```rust
 //! # use std::iter::FromIterator;
@@ -125,9 +126,9 @@
 //! # assert_eq!("Hello 大賢者", writer.0);
 //! ```
 //!
-//! Using the special literal in-line string macros [`progmem_str`]
-//! (yielding a `&str`) and [`progmem_display`] (yielding some
-//! `impl Display + uDisplay`):
+//! Using the special literal in-line string macros [`progmem_str`](crate::progmem_str)
+//! (yielding a `&str`) and [`progmem_display`](crate::progmem_display)
+//! (yielding some `impl Display + uDisplay`):
 //!
 //! ```rust
 //! use avr_progmem::progmem_str as F;
@@ -397,7 +398,7 @@ pub struct PmString<const N: usize> {
 impl<const N: usize> PmString<N> {
 	/// Creates a new byte array from the given string
 	///
-	/// You are encouraged to use the [`progmem`] macro instead.
+	/// You are encouraged to use the [`progmem`](crate::progmem) macro instead.
 	///
 	/// # Safety
 	///
@@ -541,7 +542,7 @@ impl<'a, const N: usize> Iterator for PmChars<'a, N> {
 /// Similar to the C marco, this will load the full string into RAM at once
 /// and thus the string should be of limited size, to not exceed the space
 /// available in RAM.
-/// Also see the [progmem_display] macro which does not have this limitation.
+/// Also see the [progmem_display](crate::progmem_display) macro which does not have this limitation.
 ///
 /// This macro allows to conveniently put a literal string into progmem
 /// right where it is used.

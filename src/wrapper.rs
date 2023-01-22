@@ -14,14 +14,15 @@
 //! caller must guarantee that the given pointer truly points to a valid value
 //! stored in progmem.
 //!
-//! As convenience, the [`progmem!`] macro is offered that will create
+//! As convenience, the [`progmem`] macro is offered that will create
 //! a `static` in progmem with the given value and wrap a pointer to it in the
 //! [`ProgMem`] struct for you.
 
 
-
 use derivative::Derivative;
 
+#[cfg(doc)]
+use crate::progmem;
 use crate::raw::read_value;
 
 
@@ -46,7 +47,7 @@ use crate::raw::read_value;
 /// is a very dangerous endeavor.
 ///
 /// In order to make working with progmem safer and more convenient,
-/// consider using the [`progmem!`] macro, that will put the given data
+/// consider using the [`progmem`] macro, that will put the given data
 /// into a hidden `static` in progmem and provide you with an accessible static
 /// containing the pointer to it wrapped in `ProgMem`.
 ///
@@ -155,7 +156,7 @@ impl<T> ProgMem<T> {
 	/// See the Safety section for details.
 	///
 	/// You should not need to call this function directly.
-	/// It is recommended to use the [`progmem!`] macro instead (which calls
+	/// It is recommended to use the [`progmem`] macro instead (which calls
 	/// this constructor for you, while enforcing its contract.
 	///
 	///
