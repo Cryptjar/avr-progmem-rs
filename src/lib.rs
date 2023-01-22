@@ -5,6 +5,15 @@
 // As of now (mid 2022), inline assembly for AVR is still unstable.
 #![feature(asm_experimental_arch)]
 //
+// We to access the length of a slice pointer (for unsized `ProgMem`s)
+#![feature(slice_ptr_len)]
+//
+// Allow to implement `CoerceUnsized` on `ProgMem`
+#![cfg_attr(feature = "unsize", feature(coerce_unsized))]
+//
+// Needed for implementing `CoerceUnsized` on `ProgMem`
+#![cfg_attr(feature = "unsize", feature(unsize))]
+//
 // Allows to document required crate features on items
 #![cfg_attr(doc, feature(doc_auto_cfg))]
 //
@@ -95,7 +104,7 @@
 //! use core::ptr::addr_of;
 //!
 //! // This `static` must never be directly dereferenced/accessed!
-//! // So a `let data: u8 = P_BYTE;` is **undefined behavior**!!!
+//! // So a `let data: u8 = P_BYTE;` ⚠️ is **undefined behavior**!!!
 //! /// Static byte stored in progmem!
 //! #[link_section = ".progmem.data"]
 //! static P_BYTE: u8 = b'A';
