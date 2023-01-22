@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.3.2] - 2023-01-22
+[0.3.2]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.1...v0.3.2
+
+Changes since `v0.3.1`.
+
+### Added
+
+- Add an `at` method on array wrappers (`ProgMem<[T; N]>`), which returns a wrapper to an array element, without loading it, by [@gergoerdi](https://github.com/gergoerdi) (https://github.com/Cryptjar/avr-progmem-rs/pull/9)
+- Add a `wrapper_iter` method on array wrappers (`ProgMem<[T; N]>`), which returns a `PmWrapperIter`, an iterator of wrappers of each element, by [@gergoerdi](https://github.com/gergoerdi) (https://github.com/Cryptjar/avr-progmem-rs/pull/9)
+- Add similar methods on slice wrappers (`ProgMem<[T]>`) as there are already on array wrappers and an `as_slice` method on array wrappers (https://github.com/Cryptjar/avr-progmem-rs/pull/11)
+- Add the "unsize" crate feature that allows to directly coerce `ProgMem`s.
+- Implement `Copy`, `Clone`, and `Debug` on `ProgMem` and `PmString`
+
+### Changed
+
+- Lift `Sized` constraint on `ProgMem`, which allows to wrap types such as slices (tho a slice can not be stored directly in progmem, instead a stored array can be coerce to a slice at runtime) (https://github.com/Cryptjar/avr-progmem-rs/pull/11)
+
+
+
 ## [0.3.1] - 2022-06-11
 [0.3.1]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.0...v0.3.1
 
@@ -41,7 +60,7 @@ Changes since `v0.2.0`.
 
 - Bump MSRV to `nightly-2022-05-10`.
 - Deny storing a reference in progmem (i.e. a direct `&T`) via the `progmem` macro, this should catch some common mistakes.
-- Deny storing a `LoadedString` directly in progmem (i.e. a direct `&T`) via the `progmem` macro, use the special `string` rule instead.
+- Deny storing a `LoadedString` directly in progmem via the `progmem` macro, use the special `string` rule instead.
 
 ### Internal changes
 
