@@ -30,9 +30,11 @@ opt-level = "s"
 
 [features]
 default = ["lpm-asm-loop"]
-# Enables the use of the `lpm r0, Z+` in an assembly loop, instead of the plain
-# `lpm` instruction with a Rust loop.
+
+# Deprecated, the assembly loop is now the only implementation. Enabling
+# (or disabling) this feature makes no difference, anymore.
 lpm-asm-loop = []
+
 # Enables some tweak to ease debugging, should not be use in production
 dev = []
 
