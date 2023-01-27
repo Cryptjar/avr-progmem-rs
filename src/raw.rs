@@ -125,63 +125,6 @@ pub unsafe fn read_byte(p_addr: *const u8) -> u8 {
 	}
 }
 
-/// Read an array of type `T` from progmem into data array.
-///
-/// This function uses the above byte-wise `read_byte` function instead
-/// of the looped assembly of `read_asm_loop_raw`.
-///
-///
-/// # Safety
-///
-/// This call is analog to `core::ptr::copy(p_addr, out, len as usize)` thus it
-/// has the same basic requirements such as both pointers must be valid for
-/// dereferencing i.e. not dangling and both pointers must
-/// be valid to read or write, respectively, of `len` many elements of type `T`,
-/// i.e. `len * size_of::<T>()` bytes.
-///
-/// Additionally, `p_addr` must be a valid pointer into the program memory
-/// domain. And `out` must be valid point to a writable location in the data
-/// memory.
-///
-/// However alignment is not strictly required for AVR, since the read/write is
-/// done byte-wise.
-///
-#[allow(dead_code)]
-unsafe fn read_byte_loop_raw<T>(p_addr: *const T, out: *mut T, len: u8)
-where
-	T: Sized + Copy,
-{
-	// Convert to byte pointers
-	let p_addr_bytes = p_addr as *const u8;
-	let out_bytes = out as *mut u8;
-
-	// Get size in bytes of T
-	let size_type = size_of::<T>();
-	// Must not exceed 256 byte
-	assert!(size_type <= u8::MAX as usize);
-
-	// Multiply with the given length
-	let size_bytes = size_type * len as usize;
-	// Must still not exceed 256 byte
-	assert!(size_bytes <= u8::MAX as usize);
-	// Now its fine to cast down to u8
-	let size_bytes = size_bytes as u8;
-
-	for i in 0..size_bytes {
-		let i: isize = i.into();
-
-		let value = unsafe {
-			// SAFETY: The caller must ensure that `p_addr` points into the
-			// program domain.
-			read_byte(p_addr_bytes.offset(i))
-		};
-		unsafe {
-			// SAFETY: The caller must ensure that `size_bytes` of `out` are
-			// to write to (data-domain) and are valid for `T`.
-			out_bytes.offset(i).write(value);
-		}
-	}
-}
 
 
 /// Read an array of type `T` from progmem into data array.
@@ -347,20 +290,10 @@ unsafe fn read_value_raw<T>(p_addr: *const T, out: *mut T, len: u8)
 where
 	T: Sized + Copy,
 {
-	cfg_if! {
-		if #[cfg(feature = "lpm-asm-loop")] {
-			unsafe {
-				// SAFETY: The caller must ensuer the validity of the pointers
-				// and their domains.
-				read_asm_loop_raw(p_addr, out, len)
-			}
-		} else {
-			unsafe {
-				// SAFETY: The caller must ensuer the validity of the pointers
-				// and their domains.
-				read_byte_loop_raw(p_addr, out, len)
-			}
-		}
+	unsafe {
+		// SAFETY: The caller must ensure the validity of the pointers
+		// and their domains.
+		read_asm_loop_raw(p_addr, out, len)
 	}
 }
 
