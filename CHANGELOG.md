@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## Unreleased
+
+### Internal Changes
+
+- Removed `read_byte_loop_raw` function, because it is unsound. Thanks to [workingjubilee](https://github.com/workingjubilee) for pointing this out. (https://github.com/Cryptjar/avr-progmem-rs/issues/12)
+- Made the `lpm-asm-loop` crate feature obsolete, because the lpm assembly loop is now the only implementation.
+
+
 
 ## [0.3.2] - 2023-01-22
 [0.3.2]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.1...v0.3.2
@@ -62,7 +70,7 @@ Changes since `v0.2.0`.
 - Deny storing a reference in progmem (i.e. a direct `&T`) via the `progmem` macro, this should catch some common mistakes.
 - Deny storing a `LoadedString` directly in progmem via the `progmem` macro, use the special `string` rule instead.
 
-### Internal changes
+### Internal Changes
 
 - Migrate from `llvm_asm` to `asm`.
 - Use the `addr_of` macro to never ever have a reference to progmem, just raw pointers.
@@ -91,7 +99,7 @@ Changes since `v0.1.5`.
 - Emit a warning when just storing a reference in progmem instead of the actual data via the `progmem` macro.
 - Add an [`PmIter::iter`] method to lazily iterate through an array (loading only one element at a time).
 
-### Internal changes
+### Internal Changes
 
 - Change `ProgMem` from a direct value wrapper into a pointer wrapper, thus no more references into program memory are kept only raw pointers (the accessible `static`s containing the `ProgMem` struct are in RAM, the data is stored in hidden `static`s in progmem).
 - Patch `ufmt` to fix u32 formatting (https://github.com/Cryptjar/avr-progmem-rs/commit/9d351038fc31d769206b29cd7228b35aa457b518)
@@ -138,7 +146,7 @@ Changes since `v0.1.2`.
 
 - Deprecate [`read_slice`] function, because it is based on passing around plain slices (aka a reference) to program memory, which is extremely hazardous, if not **UB**, and thus will not be supported in the future.
 
-### Internal changes
+### Internal Changes
 
 - Pin the Rust toolchain to `nightly-2021-01-07`, because at the time of writing it is the latest Rust version that supports AVR (future version are broken, also see <https://github.com/rust-lang/compiler-builtins/issues/400>).
 - Add Github CI.
@@ -167,7 +175,7 @@ Changes since `v0.1.0`.
 
 - Use the `.progmem.data` section instead of just `.progmem` to keep compatibility with `avr-binutils >= 2.30` by [@Rahix](https://github.com/Rahix) (https://github.com/Cryptjar/avr-progmem-rs/pull/2)
 
-### Internal changes
+### Internal Changes
 
 - Setup a cargo config to target the Arduino Uno by default (instead of the host), and allow to run the examples directly via `cargo run` by [@Rahix](https://github.com/Rahix) (https://github.com/Cryptjar/avr-progmem-rs/pull/2)
 
