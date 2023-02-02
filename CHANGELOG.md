@@ -8,7 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## Unreleased
+## [0.3.3] - 2023-02-02
+[0.3.3]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.2...v0.3.3
+
+Changes since [`v0.3.2`](#032---2023-01-22).
+
+_Same change set as [`v0.1.6`](#016---2023-02-02)_
+
+
+
+## [0.2.2] - 2023-02-02
+[0.2.2]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.2.1...v0.2.2
+
+Changes since [`v0.2.1`](#021---2022-06-11).
+
+_Same change set as [`v0.1.6`](#016---2023-02-02)_
+
+
+
+## [0.1.6] - 2023-02-02
+[0.1.6]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.5...v0.1.6
+
+Changes since [`v0.1.5`](#015---2022-04-02).
 
 ### Fixed
 
@@ -45,10 +66,8 @@ Changes since [`v0.3.1`](#031---2022-06-11).
 
 Changes since [`v0.3.0`](#030---2022-06-04).
 
-### Added
+_Same change set as [`v0.2.1`](#021---2022-06-11)_
 
-- Implement `IntoIterator` on array wrappers (i.e. `ProgMem<[T;N]>`) by [@mutantbob](https://github.com/mutantbob) (https://github.com/Cryptjar/avr-progmem-rs/pull/7)
-- A `len` method on array wrappers (i.e. `ProgMem<[T;N]>`).
 
 
 ## [0.2.1] - 2022-06-11
