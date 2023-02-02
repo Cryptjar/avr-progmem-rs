@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- Fixed UB when **not** using the `lpm-asm-loop` crate feature (which is enabled by default). Thanks to [workingjubilee](https://github.com/workingjubilee) for pointing this out. (https://github.com/Cryptjar/avr-progmem-rs/issues/12)
+
 ### Internal Changes
 
 - Removed `read_byte_loop_raw` function, because it is unsound. Thanks to [workingjubilee](https://github.com/workingjubilee) for pointing this out. (https://github.com/Cryptjar/avr-progmem-rs/issues/12)
@@ -122,7 +126,7 @@ Changes since `v0.1.4`.
 
 ### Fixed
 
-- Fix the clobber list of `lpm-asm-loop` inline assembly (which is used by default).
+- Fix UB due to insufficient clobber list of the inline assembly in `read_asm_loop_raw`, which is used if the `lpm-asm-loop` crate feature is enabled (which it is by default).
 
 
 
@@ -183,6 +187,6 @@ Changes since `v0.1.0`.
 
 ## 0.1.0 - 2020-09-08
 
-Initial release.
+_Initial release_
 
 
