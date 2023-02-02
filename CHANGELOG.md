@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.2] - 2023-01-22
 [0.3.2]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.1...v0.3.2
 
-Changes since `v0.3.1`.
+Changes since [`v0.3.1`](#031---2022-06-11).
 
 ### Added
 
@@ -43,7 +43,7 @@ Changes since `v0.3.1`.
 ## [0.3.1] - 2022-06-11
 [0.3.1]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.0...v0.3.1
 
-Changes since `v0.3.0`.
+Changes since [`v0.3.0`](#030---2022-06-04).
 
 ### Added
 
@@ -54,7 +54,7 @@ Changes since `v0.3.0`.
 ## [0.2.1] - 2022-06-11
 [0.2.1]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.2.0...v0.2.1
 
-Changes since `v0.2.0`.
+Changes since [`v0.2.0`](#020---2022-04-14).
 
 ### Added
 
@@ -66,7 +66,7 @@ Changes since `v0.2.0`.
 ## [0.3.0] - 2022-06-04
 [0.3.0]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.2.0...v0.3.0
 
-Changes since `v0.2.0`.
+Changes since [`v0.2.0`](#020---2022-04-14).
 
 ### Breaking Changes
 
@@ -84,7 +84,7 @@ Changes since `v0.2.0`.
 ## [0.2.0] - 2022-04-14
 [0.2.0]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.5...v0.2.0
 
-Changes since `v0.1.5`.
+Changes since [`v0.1.5`](#015---2022-04-02).
 
 ### Breaking Changes
 
@@ -122,7 +122,7 @@ Changes since `v0.1.5`.
 ## [0.1.5] - 2022-04-02
 [0.1.5]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.4...v0.1.5
 
-Changes since `v0.1.4`.
+Changes since [`v0.1.4`](#014---2022-04-02).
 
 ### Fixed
 
@@ -133,7 +133,7 @@ Changes since `v0.1.4`.
 ## [0.1.4] - 2022-04-02
 [0.1.4]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.3...v0.1.4
 
-Changes since `v0.1.3`.
+Changes since [`v0.1.3`](#013---2022-04-02).
 
 ### Documentation
 
@@ -144,7 +144,7 @@ Changes since `v0.1.3`.
 ## [0.1.3] - 2022-04-02
 [0.1.3]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.2...v0.1.3
 
-Changes since `v0.1.2`.
+Changes since [`v0.1.2`](#012---2021-01-04).
 
 ### Deprecated
 
@@ -162,7 +162,7 @@ Changes since `v0.1.2`.
 ## [0.1.2] - 2021-01-04
 [0.1.2]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.1...v0.1.2
 
-Changes since `v0.1.1`.
+Changes since [`v0.1.1`](#011---2021-01-04).
 
 ### Documentation
 
@@ -173,7 +173,7 @@ Changes since `v0.1.1`.
 ## [0.1.1] - 2021-01-04
 [0.1.1]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.1.0...v0.1.1
 
-Changes since `v0.1.0`.
+Changes since [`v0.1.0`](#010---2020-09-08).
 
 ### Changes
 
