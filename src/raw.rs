@@ -64,8 +64,7 @@ use cfg_if::cfg_if;
 /// For instance, a valid progmem statics would be one, that is attributed with
 /// `#[link_section = ".progmem.data"]`.
 ///
-/// Also general Rust pointer dereferencing constraints apply, i.e. it must not
-/// be dangling.
+/// Also general Rust pointer dereferencing constraints apply (see [`core::ptr::read`]).
 ///
 /// [`read_slice`]: fn.read_slice.html
 /// [`read_value`]: fn.read_value.html
@@ -305,10 +304,7 @@ where
 /// whether the `lpm-asm-loop` crate feature is set or not.
 ///
 /// Notice that `T` might be also something like `[T, N]` so that in fact
-/// entire arrays can be loaded using this function. Alternatively if the the
-/// size of an array can not be known at compile time (i.e. a slice) there is
-/// also the [`read_slice`] function, but it requires proper
-/// initialization upfront.
+/// entire arrays can be loaded using this function.
 ///
 /// If you need to read just a single byte you might use [`read_byte`].
 ///
@@ -369,7 +365,7 @@ where
 ///
 /// # Safety
 ///
-/// This call is analog to `core::ptr::copy` thus it
+/// This call is analog to [`core::ptr::copy`] thus it
 /// has the same basic requirements such as the pointer must be valid for
 /// dereferencing i.e. not dangling and the pointer must
 /// be valid to read one entire value of type `T`,
@@ -379,7 +375,7 @@ where
 /// domain.
 ///
 /// While the alignment is not strictly required for AVR, the non-AVR fallback
-/// might be done actually use `core::ptr::copy` and therefore the pointers
+/// might be actually using `core::ptr::copy` and therefore the pointers
 /// must be aligned.
 ///
 /// [`read_byte`]: fn.read_byte.html
@@ -391,7 +387,7 @@ where
 	T: Sized + Copy,
 {
 	// The use of an MaybeUninit allows us to correctly allocate the space
-	// required to hold one `T`, whereas we correctly comunicate that it is
+	// required to hold one `T`, whereas we correctly communicate that it is
 	// uninitialized to the compiler.
 	//
 	// The alternative of using a [0u8; size_of::<T>()] is actually much more

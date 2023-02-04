@@ -403,10 +403,7 @@ impl<const N: usize> PmString<N> {
 	/// # Safety
 	///
 	/// This function is only sound to call, if the value is
-	/// stored in a static that is for instance attributed with
-	/// `#[link_section = ".progmem.data"]`.
-	///
-	/// The give byte array must contain valid UTF-8.
+	/// is a valid `ProgMem`, and the underlying byte array contains valid UTF-8.
 	pub const unsafe fn new(pm: ProgMem<[u8; N]>) -> Self {
 		// SAFETY: the caller ensures that the bytes are valid UTF-8
 		Self {
