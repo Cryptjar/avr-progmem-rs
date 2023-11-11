@@ -1,6 +1,6 @@
 [package]
 name = "avr-progmem"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Cryptjar <cryptjar@junk.studio>"]
 license = "Apache-2.0"
 edition = "2018"
@@ -49,21 +49,21 @@ version = "2.2.0"
 features = [ "use_core" ]
 
 [dependencies.ufmt]
-version = "0.1.0"
+version = "0.2"
 optional = true
 
 
 [dev-dependencies]
 panic-halt = "0.2.0"
-ufmt = "0.1.0"
-embedded-hal = "0.2.3"
+ufmt = "0.2"
+embedded-hal = "0.2"
 
 [dev-dependencies.void]
 version = "1.0"
 default-features = false
 
 [dev-dependencies.avr-device]
-version = "0.3"
+version = "0.5"
 features = ["atmega328p", "rt"]
 
 [dev-dependencies.arduino-hal]
@@ -82,4 +82,4 @@ rev = "81edfcd908be8d3b2cd763cf2dc76aedbb22286b"
 # Fixes formatting of u32, however, it causes a link error due to u32-div
 # Which in turn is fixed (in config.toml) by:
 #     build-std-features = ["compiler-builtins-mangled-names"]
-ufmt = { git = "https://github.com/mrk-its/ufmt.git", rev = "e6e574625e89bce9a5cb907eae43bfd45672f768" }
+# ufmt = { git = "https://github.com/mrk-its/ufmt.git", rev = "e6e574625e89bce9a5cb907eae43bfd45672f768" }
