@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.4.0] - 2023-11-13
+[0.4.0]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.3...v0.4.0
+
+Changes since [`v0.3.3`](#033---2023-02-02).
+
+### Changed
+
+- Upgraded `ufmt` from `0.1` to `0.2`
+- Upgraded MSRV to `nightly-2023-08-08`
+
+
+
 ## [0.3.3] - 2023-02-02
 [0.3.3]: https://github.com/Cryptjar/avr-progmem-rs/compare/v0.3.2...v0.3.3
 
