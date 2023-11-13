@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Changes since [`v0.3.3`](#033---2023-02-02).
 
-### Changed
+### BREAKING
 
 - Upgraded `ufmt` from `0.1` to `0.2`
 - Upgraded MSRV to `nightly-2023-08-08`

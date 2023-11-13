@@ -38,13 +38,13 @@
 //!
 //! ## MSRV
 //!
-//! This crate works with a Rust `nightly-2022-05-10` compiler.
-//! All versions `0.3.x` will adhere to work with `nightly-2022-05-10`.
+//! This crate works with a Rust `nightly-2023-08-08` compiler.
+//! All versions `0.4.x` will adhere to work with `nightly-2023-08-08`.
 //! Other Rust compiler version (particularly newer ones) might also work,
 //! but due to the use of experimental compiler features it is possible that
 //! some future Rust compiler version will fail to work.
 //!
-//! Future versions such as `0.4.x` might required a newer Rust compiler
+//! Future versions such as `0.5.x` might required a newer Rust compiler
 //! version.
 //!
 //!
